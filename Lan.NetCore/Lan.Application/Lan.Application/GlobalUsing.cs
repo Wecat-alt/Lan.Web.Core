@@ -1,0 +1,10 @@
+﻿global using Infrastructure;
+global using Lan.Infrastructure;
+global using Mapster;
+global using Infrastructure.Controller;
+global using Lan.Tools;
+global using Lan.ServiceCore.IService;
+global using Lan.ServiceCore.Services;
+global using Model;
+global using Lan.Dto;
+global using Lan.Model;

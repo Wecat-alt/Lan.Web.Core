@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>	  <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mapster" Version="7.4.0" />
+    <PackageReference Include="SqlSugar.IOC" Version="2.0.1" />
+    <PackageReference Include="SqlSugarCore" Version="5.1.4.198" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Lan.Infrastructure\Lan.Infrastructure.csproj" />
+    <ProjectReference Include="..\Lan.Model\Lan.Model.csproj" />
+  </ItemGroup>
+
+</Project>

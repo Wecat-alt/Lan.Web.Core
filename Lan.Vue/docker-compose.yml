@@ -1,0 +1,15 @@
+services:
+  lan-vue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lan-vue
+    ports:
+      - '8080:80'
+    environment:
+      VITE_APP_API_BASE_URL: 'http://192.168.31.138:1233'
+      VITE_SIGNALR_URL: 'http://192.168.31.138:1233/hubs/stock'
+      VITE_OPEN_URL: 'http://192.168.31.138:5122'
+      VITE_MAP_TILE_MAP_URL: '/maptile_gaode/{z}/{x}/{y}.jpg'
+      VUE_APP_TITLE: '生产环境'
+    restart: unless-stopped
