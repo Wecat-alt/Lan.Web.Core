@@ -107,6 +107,9 @@ namespace Lan.ServiceCore.TargetCollection
                 if (radar.InvertX)  //判断是否需要对X坐标反向
                     x = -x;
 
+
+                var ss = Math.Sqrt(tar.AxesX * tar.AxesX + tar.AxesY * tar.AxesY);
+
                 string utime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss:ffffff");
                 RadarTargetItem tarItem = new RadarTargetItem(x, tar.Y, tar.SpeedY, tar.SpeedX, now, radar, tar.Type, tar.AxesX, tar.AxesY, tar.AzimuthAngle, tar.Id);
 
