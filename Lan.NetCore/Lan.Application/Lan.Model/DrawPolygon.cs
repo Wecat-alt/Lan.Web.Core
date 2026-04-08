@@ -17,5 +17,6 @@ namespace Model
         public string pointListLatLng { get; set; }
         public int Status { get; set; }
         public DateTime DateTime { get; set; } = DateTime.Now;
+        public int pointType { get; set; }
     }
 }

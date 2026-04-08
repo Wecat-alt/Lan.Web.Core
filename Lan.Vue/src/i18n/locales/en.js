@@ -59,6 +59,7 @@ export default {
     sysmanage: 'User',
     userManagement: 'User Management',
     autoMap: 'Map Download',
+    LivePreview: 'Live Preview',
   },
   radar: {
     title: 'Radar Management',

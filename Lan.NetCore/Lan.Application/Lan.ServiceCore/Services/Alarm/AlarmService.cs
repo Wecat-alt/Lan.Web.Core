@@ -28,30 +28,20 @@ namespace Lan.ServiceCore.Services
 
             var response = Queryable()
             .Where(exp.ToExpression())
-            .Where(u => SqlFunc.Subqueryable<TrackInfo>()
-                .Where(t => t.AreaId == u.AreaId)
-                .Where(t => t.UpdateTime >= u.DateTime)
-                .Where(t => t.UpdateTime <= SqlFunc.DateAdd(u.DateTime, 15, DateType.Second))
-                .Any())
-            .Select((u) => new AlarmModel
-            {
-
-                Id = u.Id,
-                CameraIp = u.CameraIp,
-                AreaId = u.AreaId,
-                AreaName = u.AreaName,
-                DateTime = u.DateTime,
-                DealWith = u.DealWith,
-                VideoName = u.VideoName.Replace(GlobalVariable.FilePath.Replace("\\", "/"), GlobalVariable.recordservicehost),
-                Level = u.Level,
-                Latitude = u.Latitude,
-                Longitude = u.Longitude
-            })
             .OrderBy(u => u.Id, OrderByType.Desc)
             .ToPage<AlarmModel, AlarmDto>(parm);
-            
+
+            if (response?.Result != null)
+            {
+                foreach (var item in response.Result)
+                {
+                    item.VideoName = item.VideoName?.Replace(GlobalVariable.FilePath.Replace("\\", "/"), GlobalVariable.recordservicehost);
+                }
+            }
+
             return response;
         }
+        //u.VideoName.Replace(GlobalVariable.FilePath.Replace("\\", "/"), GlobalVariable.recordservicehost),
         public List<AlarmModel> GetListRef(AlarmQueryDto parm)
         {
             var exp = Expressionable.Create<AlarmModel>();

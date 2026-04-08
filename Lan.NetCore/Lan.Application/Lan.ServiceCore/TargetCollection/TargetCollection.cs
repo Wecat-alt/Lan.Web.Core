@@ -85,7 +85,7 @@ namespace Lan.ServiceCore.TargetCollection
         /// </summary>
         /// <param name="radar">发生报警的雷达</param>
         /// <returns>是否成功添加了目标</returns>
-        internal bool AddTarget(WRadar radar, List<Coordinate[]> ListRadarPolygon)
+        internal bool AddTarget(WRadar radar, List<Coordinate[]> ListRadarPolygon1, List<Coordinate[]> ListRadarPolygon2, List<Coordinate[]> ListRadarPolygon3)
         {
             DateTime now = DateTime.Now;
             bool isAdded = false;
@@ -132,7 +132,14 @@ namespace Lan.ServiceCore.TargetCollection
                 float B_AzimuthAngle = float.Parse(radar.NorthDeviationAngle);
                 Double[] AlarmLonLat = Share.GetLatLon(radarLat, radarLon, double.Parse(B_AzimuthAngle.ToString()), tarItem.AxesX, tarItem.AxesY, tarItem.AzimuthAngle);
 
-                if (TrimDrawpolygon(AlarmLonLat, ListRadarPolygon))
+                if (ListRadarPolygon1.Count > 0)
+                {
+                    if (!TrimDrawpolygon(AlarmLonLat, ListRadarPolygon1))
+                    {
+                        continue;
+                    }
+                }
+                if (TrimDrawpolygon(AlarmLonLat, ListRadarPolygon2))
                 {
                     continue;
                 }

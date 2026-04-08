@@ -60,6 +60,7 @@ export default {
     userManagement: '人员管理',
     autoMap: '地图下载',
     cameraPreview: '相机预览',
+    LivePreview: '实时预览',
   },
   radar: {
     title: '雷达管理',

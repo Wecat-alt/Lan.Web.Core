@@ -34,16 +34,17 @@ import { defineComponent, onBeforeUnmount, onMounted, shallowRef } from 'vue'
 import AppSidebar from '../components/AppSidebar.vue'
 import Home from '../views/Home.vue'
 
-import calibration from '../views/device/calibration/index'
-import camera from '../views/device/camera/index'
-import defencearea from '../views/device/defencearea/index'
-import radar from '../views/device/radar/index'
-import alarm from '../views/query/alarm_index'
+import calibration from '@/views/device/calibration/index'
+import camera from '@/views/device/camera/index'
+import defencearea from '@/views/device/defencearea/index'
+import radar from '@/views/device/radar/index'
+import alarm from '@/views/query/alarm_index'
 
-import autoMap from '../views/map/AutoMap.vue'
-import realtime_map from '../views/map/realtime_map'
-import config from '../views/system/config/index'
-import user from '../views/system/user/index'
+import livePreview from '@/views/livePreview/index.vue'
+import autoMap from '@/views/map/AutoMap.vue'
+import realtime_map from '@/views/map/realtime_map'
+import config from '@/views/system/config/index'
+import user from '@/views/system/user/index'
 
 import LanguageSwitcher from '../components/LanguageSwitch.vue'
 
@@ -66,6 +67,7 @@ export default defineComponent({
       wizard: radar,
       realtime_map: realtime_map,
       autoMap: autoMap,
+      livePreview: livePreview,
       alarm: alarm,
       config: config,
       user: user,
@@ -77,10 +79,17 @@ export default defineComponent({
     const handleMenuChange = (view) => {
       // wizard flow: use localStorage wizard key to control next step
       const wizardStep = localStorage.getItem('wizard')
+      // 打开 livePreview 为单独窗口
+      if (view === 'livePreview') {
+        window.open('/livePreview', '_blank')
+        return
+      }
+
       if (view === 'radar' && wizardStep) {
         currentView.value = views['radar'] || realtime_map
         return
       }
+
       currentView.value = views[view] || realtime_map
     }
 

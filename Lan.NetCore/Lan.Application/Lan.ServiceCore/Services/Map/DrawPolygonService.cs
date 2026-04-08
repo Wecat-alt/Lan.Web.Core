@@ -79,10 +79,10 @@ namespace Lan.ServiceCore.Services
                 .ToList();
         }
 
-        public List<DrawPolygon> GetDrawPolygonByDefenceAreaId(int DefenceAreaId)
+        public List<DrawPolygon> GetDrawPolygonByDefenceAreaId(int pointType)
         {
             var response = Queryable()
-                //.Where(x => x.DefenceAreaId == DefenceAreaId)
+                .Where(x => x.pointType == pointType)
                 .ToList();
             return response;
         }

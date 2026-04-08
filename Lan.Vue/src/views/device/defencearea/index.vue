@@ -230,6 +230,7 @@
 </template>
 
 <script>
+import { getConfigKey } from '@/api/config/config'
 import {
   getCameraRepetitionJudgmentAdd,
   getCameraRepetitionJudgmentEdit,
@@ -375,10 +376,31 @@ export default {
       this.single = selection.length != 1
       this.multiple = !selection.length
     },
+    fillMapCenterToForm() {
+      getConfigKey('mapCenter').then((response) => {
+        const mapCenter = response?.data?.data
+        if (!mapCenter) {
+          return
+        }
+
+        const [latitude, longitude] = String(mapCenter)
+          .split(',')
+          .map((item) => item.trim())
+
+        if (latitude !== undefined && latitude !== '') {
+          this.form.latitude = latitude
+        }
+
+        if (longitude !== undefined && longitude !== '') {
+          this.form.longitude = longitude
+        }
+      })
+    },
     handleAdd() {
       this.reset()
       this.open = true
       this.title = this.$t('common.add')
+      this.fillMapCenterToForm()
       this._isWizard = localStorage.getItem('wizard') === 'defencearea'
     },
     handleUpdate(row) {

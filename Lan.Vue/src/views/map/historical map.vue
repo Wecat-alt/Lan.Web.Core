@@ -27,8 +27,8 @@ import { onMounted, onUnmounted, ref } from 'vue'
 // 常量定义
 const mapCenter_lat = 28.202612
 const mapCenter_lng = 112.874397
-const mapUrl = '/maptile_gaode/{z}/{x}/{y}.jpg'
-const mapZoom = 15
+var mapUrl = window.__APP_CONFIG__.VITE_MAP_TILE_MAP_URL || '/maptile_gaode/{z}/{x}/{y}.jpg'
+const mapZoom = 16
 
 // 响应式数据
 const videoSrc = ref('')
@@ -80,6 +80,8 @@ const ints = (lat, lon, radius, startAngle, endAngle, color, fillLength) => {
 }
 
 const initMap = () => {
+  console.log('回放地图URL：', mapUrl)
+
   map.value = L.map('map-container', {
     center: [mapCenter_lat, mapCenter_lng],
     zoom: mapZoom,
@@ -115,6 +117,7 @@ const initAlarm = async () => {
       )
     })
 
+    console.log('回放中心点：', latitude, longitude)
     const newLatLng = L.latLng(parseFloat(latitude), parseFloat(longitude))
     map.value.setView(newLatLng)
 

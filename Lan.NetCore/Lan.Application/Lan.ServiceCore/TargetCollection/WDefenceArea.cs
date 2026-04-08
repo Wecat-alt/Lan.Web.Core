@@ -13,7 +13,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing;
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -36,7 +35,9 @@ namespace Lan.ServiceCore.TargetCollection
         /// <summary>
         /// 绘制区域相对防区的坐标
         /// </summary>
-        public List<Coordinate[]> ListRadarPolygon;
+        public List<Coordinate[]> ListRadarPolygon1;
+        public List<Coordinate[]> ListRadarPolygon2;
+        public List<Coordinate[]> ListRadarPolygon3;
 
         const int TrackInterval = 200;
 
@@ -193,7 +194,9 @@ namespace Lan.ServiceCore.TargetCollection
             Task.Factory.StartNew(trackThread).ContinueWith(t => Console.WriteLine("防区球机控制线程发生错误\r\n"
                             + t.Exception.InnerException.ToString()),
                         TaskContinuationOptions.OnlyOnFaulted);
-            ListRadarPolygon = new List<Coordinate[]>();
+            ListRadarPolygon1 = new List<Coordinate[]>();
+            ListRadarPolygon2 = new List<Coordinate[]>();
+            ListRadarPolygon3 = new List<Coordinate[]>();
 
         }
 
@@ -229,19 +232,33 @@ namespace Lan.ServiceCore.TargetCollection
             //RadarDefenceEnable();
             DrawPolygonService drawPolygonService = new DrawPolygonService();
 
-            var drawPolygon = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID);
-            ListRadarPolygon = ConvertListRadarPolygon(drawPolygon);
+            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(1);
+            ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
+
+            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(2);
+            ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
+
+            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(3);
+            ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
 
         }
 
         public void UpdateListRadarPolygon()
         {
-            ListRadarPolygon = new List<Coordinate[]>();
+            ListRadarPolygon1 = new List<Coordinate[]>();
+            ListRadarPolygon2 = new List<Coordinate[]>();
+            ListRadarPolygon3 = new List<Coordinate[]>();
 
             DrawPolygonService drawPolygonService = new DrawPolygonService();
 
-            var drawPolygon = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID);
-            ListRadarPolygon = ConvertListRadarPolygon(drawPolygon);
+            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(1);
+            ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
+
+            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(2);
+            ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
+
+            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(3);
+            ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
         }
 
         public void Dispose()
@@ -263,6 +280,7 @@ namespace Lan.ServiceCore.TargetCollection
             {
                 return new List<Coordinate[]>();
             }
+            List<Coordinate[]> ListRadarPolygon = new List<Coordinate[]>();
 
             foreach (DrawPolygon drawPolygon in ListDrawPolygon)
             {
@@ -446,9 +464,6 @@ namespace Lan.ServiceCore.TargetCollection
         #endregion
 
         #region 目标列表和目标跟踪
-
-
-
         /// <summary>
         /// 添加雷达的报警信息到队列
         /// </summary>
@@ -456,7 +471,7 @@ namespace Lan.ServiceCore.TargetCollection
         /// <returns>是否成功添加了目标</returns>
         internal bool AddAlarmTarget(WRadar radar)
         {
-            return _targetList.AddTarget(radar, ListRadarPolygon);
+            return _targetList.AddTarget(radar, ListRadarPolygon1, ListRadarPolygon2, ListRadarPolygon3);
         }
         int newAvailableCount = 1;
         int cameraNoControlCount = 0;
@@ -501,16 +516,19 @@ namespace Lan.ServiceCore.TargetCollection
                 RADAR_TARGETS_T[] list_RADAR_TARGETS_T = new RADAR_TARGETS_T[tarItem.Count];
                 for (int i = 0; i < tarItem.Count; i++)
                 {
+
+                    //Console.WriteLine(tarItem[i].TargetId + "@" + tarItem[i].AxesX + "@" + tarItem[i].AxesY);
+
                     RADAR_TARGETS_T _RADAR_TARGETS_T = new RADAR_TARGETS_T();
 
                     _RADAR_TARGETS_T.targetId = tarItem[i].TargetId;                     //目标ID范围0x01~0x40
                     _RADAR_TARGETS_T.type = (uint)tarItem[i].TargetType;                //目标类型
-                    _RADAR_TARGETS_T.speed_X = float.Parse(tarItem[i].SpeedX, CultureInfo.InvariantCulture);                      //X方向速度
-                    _RADAR_TARGETS_T.speed_Y = float.Parse(tarItem[i].SpeedY, CultureInfo.InvariantCulture);                      //Y方向速度
+                    _RADAR_TARGETS_T.speed_X = float.Parse(tarItem[i].SpeedX);                      //X方向速度
+                    _RADAR_TARGETS_T.speed_Y = float.Parse(tarItem[i].SpeedY);                      //Y方向速度
                     _RADAR_TARGETS_T.cod_X = tarItem[i].AxesX;
                     _RADAR_TARGETS_T.cod_Y = tarItem[i].AxesY;
-                    _RADAR_TARGETS_T.distance = float.Parse(tarItem[i].Distance, CultureInfo.InvariantCulture);                     //目标距离
-                    _RADAR_TARGETS_T.azimuth = float.Parse(tarItem[i].AzimuthAngle, CultureInfo.InvariantCulture);                      //目标方位角
+                    _RADAR_TARGETS_T.distance = float.Parse(tarItem[i].Distance);                     //目标距离
+                    _RADAR_TARGETS_T.azimuth = float.Parse(tarItem[i].AzimuthAngle);                      //目标方位角
 
                     list_RADAR_TARGETS_T[i] = _RADAR_TARGETS_T;
 
@@ -529,7 +547,6 @@ namespace Lan.ServiceCore.TargetCollection
                                 {
                                     channelId = _list_RBTRACK[j].channelId;
                                     int s = RBTrackSdk.RBTRACK_UpdateTargets(channelId, list_RADAR_TARGETS_T, list_RADAR_TARGETS_T.Length);
-                                    //Console.WriteLine($"RBTRACK_UpdateTargets channelId={channelId}, targetNum={list_RADAR_TARGETS_T.Length}, result={s}");
                                 }
                             }
                         }
@@ -579,13 +596,7 @@ namespace Lan.ServiceCore.TargetCollection
         /// </summary>
         public float cameraTargetSpeed = -1;
 
-
-
-
-
         #endregion
-
-
 
         public string SearchLightIP
         {

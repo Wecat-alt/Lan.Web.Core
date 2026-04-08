@@ -72,6 +72,11 @@ const routes = [
     component: () => import('@/views/map/AutoMap.vue'),
   },
   {
+    path: '/livePreview',
+    name: 'livePreview',
+    component: () => import('@/views/livePreview/index.vue'),
+  },
+  {
     path: '/historical_map',
     name: 'historical_map',
     component: () => import('@/views/map/historical map'),

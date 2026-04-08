@@ -48,6 +48,9 @@
       <el-menu-item index="autoMap">
         <span>{{ $t('nav.autoMap') }}</span>
       </el-menu-item>
+      <el-menu-item index="livePreview">
+        <span>{{ $t('nav.LivePreview') }}</span>
+      </el-menu-item>
       <!-- <el-menu-item index="defencearea">
         <span>{{ $t('nav.pop_up') }}</span>
       </el-menu-item> -->
