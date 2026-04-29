@@ -35,6 +35,8 @@ namespace Model
         public string? Password { get; set; }
         [SugarColumn(IsIgnore = true)]
         public string? CameraURL { get; set; }
+        [SugarColumn(IsIgnore = true)]
+        public bool Online { get; set; }
     }
 
     public class UpdateRadarArea

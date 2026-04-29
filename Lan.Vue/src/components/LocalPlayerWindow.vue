@@ -45,6 +45,10 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import {
+  isDocumentActuallyForeground,
+  usePreviewVisibility,
+} from '@/composables/usePreviewVisibility'
+import {
   sendCreateWinMessage,
   sendDeleteWinMessage,
   sendUpdateWinPosMessage,
@@ -90,7 +94,6 @@ const VIEWPORT_GAP = 0
 const panelRef = ref(null)
 const zIndex = ref(3000)
 const activeWinId = ref('')
-const isPageForeground = ref(document.visibilityState !== 'hidden' && document.hasFocus())
 const position = ref({
   left: props.initialRect.left ?? 0,
   top: props.initialRect.top ?? 0,
@@ -202,12 +205,13 @@ function bringToFront() {
   zIndex.value += 1
 }
 
-function getPageForegroundState() {
-  return document.visibilityState !== 'hidden' && document.hasFocus()
-}
-
 async function createOrRefreshWindow() {
-  if (!props.modelValue || !currentWinId.value || !isPageForeground.value) {
+  if (
+    !props.modelValue ||
+    !currentWinId.value ||
+    !isPageForeground.value ||
+    !isDocumentActuallyForeground()
+  ) {
     return
   }
 
@@ -408,22 +412,21 @@ function resetPosition() {
   }
 }
 
-async function syncPreviewVisibility() {
-  const nextForegroundState = getPageForegroundState()
-  isPageForeground.value = nextForegroundState
+const { isPageForeground, syncPreviewVisibility } = usePreviewVisibility({
+  // 页面回到前台后，仅在手动预览处于显示状态时恢复远端窗口。
+  onForeground: async () => {
+    if (!props.modelValue || !isDocumentActuallyForeground()) {
+      return
+    }
 
-  if (!props.modelValue) {
-    return
-  }
-
-  if (nextForegroundState) {
     await nextTick()
     await createOrRefreshWindow()
-    return
-  }
-
-  await closeRemoteWindow()
-}
+  },
+  // 页面失焦或隐藏时立即关闭远端窗口，确保本地与远端状态一致。
+  onBackground: async () => {
+    await closeRemoteWindow()
+  },
+})
 
 watch(
   () => props.modelValue,
@@ -473,9 +476,6 @@ function handleWindowResize() {
 }
 
 window.addEventListener('resize', handleWindowResize)
-window.addEventListener('focus', syncPreviewVisibility)
-window.addEventListener('blur', syncPreviewVisibility)
-document.addEventListener('visibilitychange', syncPreviewVisibility)
 
 onBeforeUnmount(async () => {
   if (syncTimer) {
@@ -489,9 +489,6 @@ onBeforeUnmount(async () => {
   stopDrag()
   stopResize()
   window.removeEventListener('resize', handleWindowResize)
-  window.removeEventListener('focus', syncPreviewVisibility)
-  window.removeEventListener('blur', syncPreviewVisibility)
-  document.removeEventListener('visibilitychange', syncPreviewVisibility)
   await closeRemoteWindow()
 })
 </script>

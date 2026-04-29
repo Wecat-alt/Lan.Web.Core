@@ -5,32 +5,30 @@ using System.Data;
 
 namespace Lan.Database
 {
-    public class CameraDatabase 
+    public class CameraDatabase
     {
         public static WCamera[] GetCameras()
         {
-            CameraService cameraService = new CameraService();
+            CameraService cameraService = new();
             var ds = cameraService.GetAllList();
 
             if (ds.Count == 0)
-                return new WCamera[0];
+                return [];
 
-            List<WCamera> list = new List<WCamera>(ds.Count);
+            List<WCamera> list = new(ds.Count);
             foreach (CameraModel dtRow in ds)
             {
                 try
                 {
-                    WCamera camera = new WCamera(dtRow);
-                    list.Add(camera);
+                    list.Add(new WCamera(dtRow));
                 }
                 catch (System.Exception ex)
                 {
-                    //Log.Error("从数据库加载相机失败：\r\n" + ex.ToString());
                     Console.WriteLine("从数据库加载相机失败：\r\n" + ex.ToString());
                 }
             }
 
-            return list.ToArray();
+            return [.. list];
         }
     }
 }

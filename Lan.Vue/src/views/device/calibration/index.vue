@@ -412,7 +412,7 @@
               <el-col :xs="24" :sm="11">
                 <div class="ptz-card ptz-card--control">
                   <PTZ @childEvent1="handleChildBegin" @childEvent2="handleChildStop" />
-                  <el-slider v-model="speed" class="ptz-speed" step="0.2" max="10" />
+                  <el-slider v-model="speed" class="ptz-speed" step="0.1" max="1" />
                 </div>
               </el-col>
               <el-col :xs="24" :sm="13">
@@ -518,10 +518,9 @@ import {
 } from '@/api/device/camera'
 import { allDefencearea } from '@/api/device/defencearea.js'
 import LocalPlayerWindow from '@/components/LocalPlayerWindow.vue'
+import { initSignalR, setSignalRReceiveEnabled } from '@/utils/signalRUtils'
 import PTZ from '@/views/components/PTZ'
 import { ElMessage, ElMessageBox } from 'element-plus'
-
-import * as signalR from '@microsoft/signalr'
 
 const { proxy } = getCurrentInstance()
 const defenceareaOptions = ref([])
@@ -591,6 +590,7 @@ let radarCanvas = ref(null)
 let radarCtx = ref(null)
 
 let connection = ref(null)
+let unsubscribeSignalR = null
 // 长链接数据接口
 let longLinkApi = window.__APP_CONFIG__.VITE_SIGNALR_URL
 // 长链接接受数据
@@ -892,62 +892,34 @@ function initRadar() {
 let points = []
 const POINT_LIFETIME = 1000 // 每个点显示5秒
 function initPoints(longLinkApi, acceptMsg, longLinkSendMsg) {
-  connection.value = new signalR.HubConnectionBuilder()
-    .withUrl(longLinkApi, {})
-    .withAutomaticReconnect([1000, 4000, 1000, 4000]) // 断线自动重连
-    .configureLogging(signalR.LogLevel.Error)
-    .build()
-  connection.value.on(acceptMsg, (res) => {
-    const serverData = JSON.parse(res)
+  initSignalR({
+    api: longLinkApi,
+    acceptMsg,
+    sendMsg: longLinkSendMsg,
+    onAcceptMessage: (res) => {
+      const serverData = JSON.parse(res)
 
-    // 添加新点并记录添加时间
-    const x = parseFloat(serverData.axesX) + 500
-    const y = 700 - parseFloat(serverData.axesY)
-    const targetType = '人'
-    points.push({
-      x,
-      y,
-      targetId: serverData.targetId,
-      targetType,
-      timestamp: Date.now(),
-    })
+      // 添加新点并记录添加时间
+      const x = parseFloat(serverData.axesX) + 500
+      const y = 700 - parseFloat(serverData.axesY)
+      const targetType = '人'
+      points.push({
+        x,
+        y,
+        targetId: serverData.targetId,
+        targetType,
+        timestamp: Date.now(),
+      })
 
-    // 限制数组大小
-    if (points.length > 50) {
-      points.shift()
-    }
-  })
-
-  //自动重连成功后的处理
-  connection.value.onreconnected((connectionId) => {
-    console.log(connectionId, '自动重新连接成功')
-  })
-  // 开始
-  if (connection.value.state !== signalR.HubConnectionState.Connected) {
-    connection.value.start().then(() => {
-      console.log('启动即时通信成功jiaozhun')
-    })
-  }
-  // 生命周期
-  connection.value.onreconnecting((error) => {
-    console.log(acceptMsg, +'**', longLinkSendMsg, '重新连接ing', error)
-    console.log(1)
-    console.log(connection.value.state)
-    console.log(connection.value.state === signalR.HubConnectionState.Reconnecting)
-  })
-  // (默认4次重连)，任何一次只要回调成功，调用
-  connection.value.onreconnected((connectionId) => {
-    console.log('链接id', connectionId)
-    console.log(2)
-    console.log(connection.value.state)
-    console.log(connection.value.state === signalR.HubConnectionState.Connected)
-    if (connection.value.state === signalR.HubConnectionState.Connected) {
-      console.log(acceptMsg, +'**', longLinkSendMsg, '重连')
-    }
-    // this.init()
-  })
-  connection.value.onclose((error) => {
-    console.log('关闭', error)
+      // 限制数组大小
+      if (points.length > 50) {
+        points.shift()
+      }
+    },
+  }).then(({ connection: sharedConnection, unsubscribe }) => {
+    connection.value = sharedConnection
+    unsubscribeSignalR = unsubscribe
+    setSignalRReceiveEnabled(true)
   })
 
   animate()
@@ -1014,7 +986,10 @@ function submit() {
 }
 
 onBeforeUnmount(() => {
-  connection.value.stop()
+  if (typeof unsubscribeSignalR === 'function') {
+    unsubscribeSignalR()
+    unsubscribeSignalR = null
+  }
 })
 </script>
 <style lang="scss" scoped>

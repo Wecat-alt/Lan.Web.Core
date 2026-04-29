@@ -164,13 +164,14 @@ import { updateConfig } from '@/api/system/config'
 import LocalPlayerWindow from '@/components/LocalPlayerWindow.vue'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
-import * as signalR from '@microsoft/signalr'
 import L from 'leaflet'
 import 'leaflet.motion/dist/leaflet.motion.js'
 import 'leaflet/dist/leaflet.css'
 
 import { CircleCloseFilled } from '@element-plus/icons-vue'
 
+import { createRadarAlertSwitcher, ints, unregisterSectorMarker } from '@/utils/mapUtils'
+import { initSignalR, setSignalRReceiveEnabled } from '@/utils/signalRUtils'
 import { TrackManager } from '@/utils/TrackManager'
 
 const trackManager = ref(null)
@@ -182,7 +183,6 @@ const visible = ref(false)
 
 const { proxy } = getCurrentInstance()
 
-var trackRoute = null //json目标数据
 var mapUrl = window.__APP_CONFIG__.VITE_MAP_TILE_MAP_URL || '/maptile_gaode/{z}/{x}/{y}.jpg'
 
 let sectors = ref([])
@@ -197,7 +197,6 @@ let timer4 = null
 
 let timerOpen = null
 
-let seqGroup = null
 let seqGroupLatLon = []
 let seqGroups = []
 
@@ -209,17 +208,14 @@ let alarmData = ref({
 })
 
 let connection = ref(null)
+let unsubscribeSignalR = null
 // 长链接数据接口
 const longLinkApi = window.__APP_CONFIG__.VITE_SIGNALR_URL
 // 长链接接受数据
 const longLinkMsg = 'ReceiveTargetData'
 const longLinkSendMsg = 'ReceiveTargetData'
-const serverData = []
 
 //let  trackTarget=ref('');
-// 查询参数
-const defenceareaOptions = []
-
 const y_Id = ref(0)
 
 const queryParams = reactive({
@@ -243,7 +239,6 @@ const form = {
 const drawPolygon = []
 
 //Radar扇形图和扇形图集合
-const radarDevice = null
 const radarDevices = []
 
 const radarDraw = {
@@ -275,6 +270,14 @@ const previewWinOptions = ref({})
 const activePreviewKey = ref('')
 let videoAutoCloseTimer = null
 let externalOpenTimer = null
+const defaultRadarIconUrl = '/status/radar_lan.png'
+const alertRadarIconUrl = '/status/radar_red.png'
+const radarAlertSwitcher = createRadarAlertSwitcher({
+  sectors,
+  defaultIconUrl: defaultRadarIconUrl,
+  alertIconUrl: alertRadarIconUrl,
+  timeout: 3000,
+})
 
 const closeVideoPopup = () => {
   showVideoPopup.value = false
@@ -364,14 +367,14 @@ const saveAngle = () => {
   clearAll()
   var tt = radarOptions.value.find((item) => item.id == queryParams.id)
   tt.defenceAngle = queryParams.angle
-  updateRadar(tt).then((res) => {
+  updateRadar(tt).then(() => {
     handall()
   })
 }
-function saveRadius(newValue) {
+function saveRadius() {
   clearAll()
 
-  radarDevices.forEach((item, i) => {
+  radarDevices.forEach((item) => {
     map.value.removeLayer(item)
   })
   radarDevices.value = []
@@ -379,14 +382,14 @@ function saveRadius(newValue) {
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.defenceRadius = queryParams.radius
 
-  updateRadar(tt).then((res) => {
+  updateRadar(tt).then(() => {
     handall()
   })
 }
-function saveDirection(newValue) {
+function saveDirection() {
   clearAll()
 
-  radarDevices.forEach((item, i) => {
+  radarDevices.forEach((item) => {
     map.value.removeLayer(item)
   })
   radarDevices.value = []
@@ -394,14 +397,14 @@ function saveDirection(newValue) {
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.northDeviationAngle = JSON.stringify(queryParams.northDeviationAngle)
 
-  updateRadar(tt).then((res) => {
+  updateRadar(tt).then(() => {
     handall()
   })
 }
-function handleChangeLan(newValue) {
+function handleChangeLan() {
   clearAll()
 
-  radarDevices.forEach((item, i) => {
+  radarDevices.forEach((item) => {
     map.value.removeLayer(item)
   })
   radarDevices.value = []
@@ -409,14 +412,14 @@ function handleChangeLan(newValue) {
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.latitude = JSON.stringify(queryParams.radarLat)
 
-  updateRadar(tt).then((response) => {
+  updateRadar(tt).then(() => {
     handall()
   })
 }
-function handleChangeLon(newValue) {
+function handleChangeLon() {
   clearAll()
   //number | undefined
-  radarDevices.forEach((item, i) => {
+  radarDevices.forEach((item) => {
     map.value.removeLayer(item)
   })
   radarDevices.value = []
@@ -424,7 +427,7 @@ function handleChangeLon(newValue) {
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.longitude = JSON.stringify(queryParams.radarLon)
 
-  updateRadar(tt).then((response) => {
+  updateRadar(tt).then(() => {
     handall()
   })
 }
@@ -465,23 +468,62 @@ function handall() {
       const username = item.username
       const password = item.password
       const cameraURL = item.cameraURL
-      ints(
-        item.latitude,
-        item.longitude,
-        parseFloat(item.defenceRadius),
-        begin,
-        end,
-        item.defenceEnable == 1 ? 'Yellow' : 'red',
-        item.status == 1 ? 0.1 : 0.1,
-        cameraIp,
-        username,
-        password,
-        cameraURL,
-        item.ip,
-      )
+      const sectorLayer = ints({
+        map: map.value,
+        lat: item.latitude,
+        lon: item.longitude,
+        radius: parseFloat(item.defenceRadius),
+        startAngle: begin,
+        endAngle: end,
+        color: item.defenceEnable == 1 ? 'Yellow' : 'red',
+        fillLength: item.status == 1 ? 0.1 : 0.1,
+        markerKey: item.ip,
+        markerOptions: {
+          pane: 'bottomMarkers',
+          draggable: true,
+          ip: item.ip,
+        },
+        markerProperties: {
+          cameraIp,
+          username,
+          password,
+          cameraURL,
+        },
+        iconUrl: defaultRadarIconUrl,
+        onMarkerClick: ({ properties }) => {
+          const { cameraIp, username, password, cameraURL } = properties
+
+          if (cameraIp != null && username != null && password != null && cameraURL != null) {
+            openLocalPlayerPreview({
+              cameraIp,
+              username,
+              password,
+              cameraURL,
+            })
+          }
+        },
+        onMarkerDragEnd: ({ event }) => {
+          var lat1 = parseFloat(event.target._latlng.lat).toFixed(6)
+          var lng1 = parseFloat(event.target._latlng.lng).toFixed(6)
+
+          updateLatLng(event.target.options.ip, lat1, lng1).then((res) => {
+            const { status } = res
+            if (status == 200) {
+              clearAll()
+              proxy.$modal.msgSuccess(proxy.$t('message.success'))
+              handall()
+            }
+          })
+        },
+      })
+
+      if (sectorLayer) {
+        sectors.value.push(sectorLayer)
+      }
     }
   })
 }
+
 function initMap() {
   console.log('地图URL：', mapUrl)
 
@@ -558,7 +600,7 @@ function initMap() {
     form.pointListLatLng = jsonString
     form.defenceAreaId = queryParams.id
     form.pointType = selectedType.value
-    addDrawPolygon(form).then((response) => {
+    addDrawPolygon(form).then(() => {
       proxy.$modal.msgSuccess(proxy.$t('message.addSuccess'))
     })
     map.value.pm.setPathOptions({
@@ -591,7 +633,7 @@ function initMap() {
       })
   })
 
-  map.value.on('pm:globalremovalmodetoggled', (e) => {
+  map.value.on('pm:globalremovalmodetoggled', () => {
     //点击开始/结束 删除时出发
     //console.log("4"+e);
   })
@@ -696,7 +738,7 @@ function clear_SeqGroupLatLon() {
 }
 function clear_HisTarget() {
   timer2 = setInterval(() => {
-    his_seqGroups.forEach((element, index, arr) => {
+    his_seqGroups.forEach((element, index) => {
       var time_now = Date.now()
       var ss = time_now - element.timeClear
       if (ss > 2000) {
@@ -706,213 +748,33 @@ function clear_HisTarget() {
     })
   }, 1000)
 }
-function init(api, acceptMsg, sendMsg) {
+async function init(api, acceptMsg, sendMsg) {
   console.log('signalRapi 请求地址：', api)
 
-  connection.value = new signalR.HubConnectionBuilder()
-    .withUrl(api, {})
-    .withAutomaticReconnect([1000, 4000, 1000, 4000]) // 断线自动重连
-    .configureLogging(signalR.LogLevel.Error)
-    .build()
-
-  connection.value.on(acceptMsg, (res) => {
-    handleRadarData(res)
+  const { connection: sharedConnection, unsubscribe } = await initSignalR({
+    api,
+    acceptMsg,
+    sendMsg,
+    onAcceptMessage: (res) => {
+      radarAlertSwitcher.handlePayload(res)
+      handleRadarData(res)
+    },
+    onTrackTargetData: (res) => {
+      trackTarget(res)
+    },
   })
 
-  connection.value.on('TrackTargetData', (res) => {
-    //this.trackTarget=res;
-
-    trackTarget(res)
-    //console.log("TrackTargetData", '获取数据：', res);
-  })
-
-  //自动重连成功后的处理
-  connection.value.onreconnected((connectionId) => {
-    console.log(connectionId, '自动重新连接成功')
-  })
-  // 开始
-  if (connection.value.state !== signalR.HubConnectionState.Connected) {
-    connection.value.start().then((res) => {
-      console.log('启动即时通信成功')
-      // connection.invoke()
-    })
-  }
-  // 生命周期
-  connection.value.onreconnecting((error) => {
-    console.log(acceptMsg, +'**', sendMsg, '重新连接ing', error)
-    console.log(1)
-    console.log(connection.value.state)
-    console.log(connection.value.state === signalR.HubConnectionState.Reconnecting)
-  })
-  // (默认4次重连)，任何一次只要回调成功，调用
-  connection.value.onreconnected((connectionId) => {
-    console.log('链接id', connectionId)
-    console.log(2)
-    console.log(connection.value.state)
-    console.log(connection.value.state === signalR.HubConnectionState.Connected)
-    if (connection.value.state === signalR.HubConnectionState.Connected) {
-      console.log(acceptMsg, +'**', sendMsg, '重连')
-      // connection.invoke()
-    }
-  })
-  connection.value.onclose((error) => {
-    console.log('关闭', error)
-  })
-}
-function ints(
-  lat,
-  lon,
-  radius,
-  startAngle,
-  endAngle,
-  color,
-  fillLength,
-  cameraIp,
-  username,
-  password,
-  cameraURL,
-  radarIp,
-) {
-  const degreeToRadian = (degree) => {
-    // 将角度转换为弧度，并调整0°为正北方向（数学坐标系）
-    // 同时转换为顺时针方向（地理坐标系）
-    return ((90 - degree) * Math.PI) / 180
-  }
-  // 绘制扇形
-  const drawSector = (lat, lon, radius, startAngle, endAngle, color, fillLength) => {
-    // 将角度转换为弧度（修正后的）
-    const startRad = degreeToRadian(startAngle)
-    const endRad = degreeToRadian(endAngle)
-
-    var center = L.latLng(parseFloat(lat), parseFloat(lon))
-
-    // 计算扇形点
-    const points = [center]
-    const steps = Math.max(16, Math.floor(Math.abs(endAngle - startAngle) / 5))
-
-    for (let i = 0; i <= steps; i++) {
-      const angle = startRad + (endRad - startRad) * (i / steps)
-      const point = L.latLng(
-        center.lat + (radius * Math.sin(angle)) / 111320,
-        center.lng + (radius * Math.cos(angle)) / (111320 * Math.cos((center.lat * Math.PI) / 180)),
-      )
-      points.push(point)
-    }
-
-    points.push(center)
-
-    // 创建扇形多边形
-    const sector = L.polygon(points, {
-      interactive: false,
-      color: color,
-      fillColor: color,
-      fillOpacity: fillLength,
-      weight: 1,
-    }).addTo(map.value)
-
-    const customIcon = L.icon({
-      iconUrl: '/radar_lan.png', // 图标路径
-      iconSize: [25, 25], // 图标大小，根据实际图片调整
-      iconAnchor: [12, 25], // 图标锚点，即图标底部中间点
-    })
-    const properties = {
-      cameraIp: cameraIp,
-      username: username,
-      password: password,
-      cameraURL: cameraURL,
-    }
-    // 添加扇形中心标记
-    const marker = L.marker(center, {
-      icon: customIcon,
-      pane: 'bottomMarkers',
-      draggable: true,
-      ip: radarIp,
-    }).addTo(map.value)
-    marker.properties = properties
-
-    // marker.bindPopup(`
-    //   <div>
-    //     <strong>扇形信息</strong><br>
-    //     中心位置: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}<br>
-    //     半径: ${radius}米<br>
-    //     角度: ${startAngle}°-${endAngle}°<br>
-    //     方向: ${getDirectionDescription(startAngle, endAngle)}
-    //   </div>
-    // `);
-    marker.on('click', function (e) {
-      const { cameraIp, username, password, cameraURL } = properties
-
-      if (cameraIp != null && username != null && password != null && cameraURL != null) {
-        openLocalPlayerPreview({
-          cameraIp,
-          username,
-          password,
-          cameraURL,
-        })
-      }
-    })
-
-    marker.on('dragend', function (event) {
-      var lat1 = parseFloat(event.target._latlng.lat).toFixed(6)
-      var lng1 = parseFloat(event.target._latlng.lng).toFixed(6)
-
-      updateLatLng(event.target.options.ip, lat1, lng1).then((res) => {
-        const { status, data } = res
-        if (status == 200) {
-          //经纬度位置更新成功
-          clearAll()
-          proxy.$modal.msgSuccess(proxy.$t('message.success'))
-          handall()
-        }
-      })
-    })
-    sectors.value.push({ polygon: sector, marker: marker })
-  }
-  //
-  //获取方向描述
-  const getDirectionDescription = (start, end) => {
-    const directions = [
-      { angle: 0, name: '北' },
-      { angle: 45, name: '东北' },
-      { angle: 90, name: '东' },
-      { angle: 135, name: '东南' },
-      { angle: 180, name: '南' },
-      { angle: 225, name: '西南' },
-      { angle: 270, name: '西' },
-      { angle: 315, name: '西北' },
-    ]
-
-    const getDirection = (angle) => {
-      let closest = directions[0]
-      for (const dir of directions) {
-        if (Math.abs(angle - dir.angle) < Math.abs(angle - closest.angle)) {
-          closest = dir
-        }
-      }
-      return closest.name
-    }
-
-    return `${getDirection(start)} 到 ${getDirection(end)}`
-  }
-
-  drawSector(
-    lat,
-    lon,
-    radius,
-    startAngle,
-    endAngle,
-    color,
-    fillLength,
-    cameraIp,
-    username,
-    password,
-    cameraURL,
-  )
+  connection.value = sharedConnection
+  unsubscribeSignalR = unsubscribe
+  setSignalRReceiveEnabled(true)
 }
 function clearAll() {
   sectors.value.forEach((sector) => {
     map.value.removeLayer(sector.polygon)
-    map.value.removeLayer(sector.marker)
+    if (sector.marker) {
+      unregisterSectorMarker(map.value, sector.marker)
+      map.value.removeLayer(sector.marker)
+    }
   })
   sectors.value = []
 
@@ -961,16 +823,6 @@ const getTypeName = (type) => {
   return typeMap[type] || '未知区域'
 }
 
-// 获取标签类型
-const getTagType = (type) => {
-  const tagTypeMap = {
-    1: 'danger', // 报警区域用红色
-    2: 'info', // 过滤区域用蓝色
-    3: 'warning', // 预警区域用黄色
-  }
-  return tagTypeMap[type] || ''
-}
-
 // 获取线条颜色
 const getLineColor = (type) => {
   const colorMap = {
@@ -982,7 +834,12 @@ const getLineColor = (type) => {
 }
 
 onBeforeUnmount(() => {
-  connection.value.stop()
+  if (typeof unsubscribeSignalR === 'function') {
+    unsubscribeSignalR()
+    unsubscribeSignalR = null
+  }
+
+  radarAlertSwitcher.resetAll()
 
   clearInterval(timer1)
   clearInterval(timer2)
@@ -1057,84 +914,11 @@ const handleRadarData = (res) => {
   }
 }
 
-// 新增：向固定本地接口 POST 摄像头信息
-const handleAdditionalLogic = async (targetData) => {
-  try {
-    const payload = {
-      CameraIp:
-        targetData.cameraIp ||
-        targetData.CameraIp ||
-        (targetData.properties && targetData.properties.cameraIp) ||
-        '',
-      UserName:
-        targetData.username ||
-        targetData.UserName ||
-        (targetData.properties && targetData.properties.username) ||
-        '',
-      PassWord:
-        targetData.password ||
-        targetData.PassWord ||
-        (targetData.properties && targetData.properties.password) ||
-        '',
-      CameraURL:
-        targetData.cameraURL ||
-        targetData.CameraURL ||
-        (targetData.properties && targetData.properties.cameraURL) ||
-        '',
-    }
-
-    await fetch('http://127.0.0.1:56569/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-      .then((res) => {
-        if (!res.ok) console.error('POST /mac failed', res.status)
-      })
-      .catch((e) => {
-        console.error('POST /mac error', e)
-      })
-  } catch (error) {
-    console.error('handleAdditionalLogic error', error)
-  }
-}
-
 // 跟踪特定目标
 const trackTarget = (targetId) => {
   if (trackManager.value) {
     trackManager.value.setTrackTarget(targetId)
   }
-}
-
-// 清除所有轨迹
-const clearAllTracks = () => {
-  if (trackManager.value) {
-    trackManager.value.clearAll()
-    targetList.value = []
-    activeTargetCount.value = 0
-    trackedTargetId.value = null
-  }
-}
-
-// 获取目标类型文本
-const getTypeText = (type) => {
-  switch (type) {
-    case 1:
-      return '人员'
-    case 2:
-      return '车辆'
-    default:
-      return '未知'
-  }
-}
-
-// 格式化时间
-const formatTime = (timestamp) => {
-  const date = new Date(timestamp)
-  return `${date.getHours().toString().padStart(2, '0')}:${date
-    .getMinutes()
-    .toString()
-    .padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`
 }
 
 const setCenter = () => {

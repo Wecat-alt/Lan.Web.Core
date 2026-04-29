@@ -1,6 +1,8 @@
-﻿using Lan.Infrastructure.Cache;
+﻿using Infrastructure;
+using Lan.Infrastructure;
 using Lan.Infrastructure.CameraOnvif;
 using Lan.ServiceCore.TargetCollection;
+using MemoryCache.Core;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -496,6 +498,8 @@ namespace Lan.ServiceCore.Onvif
 
         #endregion
 
+        private readonly IMemoryCacheService? _cache;
+
         WCamera cameraBuffer; //相机缓冲区
         IntPtr handle; //视频播放句柄
         ONVIF_COMMON_INFO common = new ONVIF_COMMON_INFO();
@@ -509,6 +513,8 @@ namespace Lan.ServiceCore.Onvif
 
         public VideoPreview()
         {
+            
+            _cache = App.GetService<IMemoryCacheService>();
             //this.handle = this.Handle; //视频句柄
             //LoadPath("NovaPlayer");        //加载onvif DLL路径
             Console.WriteLine("Initializing NovaPlayer...");
@@ -570,7 +576,8 @@ namespace Lan.ServiceCore.Onvif
             {
                 this.cameraBuffer = f_cameraBuffer;
 
-                common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(f_cameraBuffer.Ip);
+                //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(f_cameraBuffer.Ip);
+                common = _cache.Get<ONVIF_COMMON_INFO>(f_cameraBuffer.Ip);
 
                 int id = LoginRecord(f_cameraBuffer.Ip, f_cameraBuffer.Username, f_cameraBuffer.Password);
                 return id;

@@ -9,6 +9,7 @@ namespace Lan.ServiceCore.IService
     public interface IRadarService
     {
         List<RadarModel> GetList(RadarQueryDto parm);
+        List<RadarModel> GetListALL();
         List<RadarModel> GetListByAreaId(int Id);
         RadarModel GetInfo(int Id);
         bool GetInfoByIp(string Ip);

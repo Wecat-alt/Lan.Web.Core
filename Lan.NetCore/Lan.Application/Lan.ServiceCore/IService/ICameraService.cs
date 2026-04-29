@@ -12,6 +12,7 @@ namespace Lan.ServiceCore.IService
     public interface ICameraService
     {
         List<CameraModel> GetList(CameraQueryDto parm);
+        Task<List<CameraModel>> GetListPreviewAsync();
         CameraModel GetInfo(int Id);
         CameraModel GetInfo(string Ip);
         bool GetInfoByIp(string Ip);
@@ -29,5 +30,6 @@ namespace Lan.ServiceCore.IService
         string RepetitionJudgmentEdit(int BindingAreaId, int[] cameraIds);
         void GetMinZoomPT(int Id, string Ip);
         void GetMaxZoomPT(int Id, string Ip);
+
     }
 }

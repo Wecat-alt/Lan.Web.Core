@@ -66,6 +66,15 @@ namespace Model
 
         public int CameraId { get; set; }
         public string SourceToken { get; set; }
-        
+
+        [SugarColumn(IsIgnore = true)]
+        public bool Online { get; set; }
+        [SugarColumn(IsIgnore = true)]
+        public string Manufacturer { get; set; }
+        [SugarColumn(IsIgnore = true)]
+        public string DeviceTypeName { get; set; }
+        [SugarColumn(IsIgnore = true)]
+        public string ZoneName { get; set; }
+
     }
 }

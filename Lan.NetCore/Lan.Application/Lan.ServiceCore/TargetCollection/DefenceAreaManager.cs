@@ -48,11 +48,12 @@ namespace Lan.ServiceCore.TargetCollection
                 dic = new Dictionary<int, WDefenceArea>();
             else
             {
-                dic = new Dictionary<int, WDefenceArea>(allDefenceArea.Length);
-                foreach (WDefenceArea defenceArea in allDefenceArea)
-                {
-                    dic[defenceArea.ID] = defenceArea;
-                }
+                dic = allDefenceArea.ToDictionary(static c => c.ID);
+                //new Dictionary<int, WDefenceArea>(allDefenceArea.Length);
+                //foreach (WDefenceArea defenceArea in allDefenceArea)
+                //{
+                //    dic[defenceArea.ID] = defenceArea;
+                //}
             }
 
             return new ConcurrentDictionary<int, WDefenceArea>(dic);

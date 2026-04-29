@@ -1,6 +1,7 @@
 import { login as apiLogin } from '@/api/system/login'
 import { removeToken, setToken } from '@/utils/auth'
 import { closeLocalPlayerSocket, initializeLocalPlayerSocket } from '@/utils/localPlayerSocket'
+import { buildAuthProfile, clearAuthProfile, setAuthProfile } from '@/utils/permission'
 import { defineStore } from 'pinia'
 
 export const useAuthStore = defineStore('auth', {
@@ -15,6 +16,7 @@ export const useAuthStore = defineStore('auth', {
         if (code == 200) {
           const token = data && (data.token || data.accessToken || data.Authorization)
           if (token) setToken(token)
+          setAuthProfile(buildAuthProfile(data, username))
           this.isAuthenticated = true
           localStorage.setItem('isAuthenticated', 'true')
           initializeLocalPlayerSocket().catch(() => {})
@@ -30,6 +32,7 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false
       localStorage.removeItem('isAuthenticated')
       removeToken()
+      clearAuthProfile()
     },
   },
 })

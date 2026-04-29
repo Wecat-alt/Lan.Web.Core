@@ -67,8 +67,9 @@
 <script setup>
 import { login } from '@/api/system/login'
 import { initializeLocalPlayerSocket } from '@/utils/localPlayerSocket'
+import { buildAuthProfile, setAuthProfile } from '@/utils/permission'
 import starBackground from '@/views/components/starBackground.vue'
-// import { ref } from 'vue'
+import { getCurrentInstance, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // import { useAuthStore } from '../stores/auth'
 
@@ -118,6 +119,7 @@ const handleLogin = async () => {
       if (token) {
         localStorage.setItem('token', token)
       }
+      setAuthProfile(buildAuthProfile(data, loginForm.value.username))
       localStorage.setItem('isAuthenticated', 'true')
       initializeLocalPlayerSocket().catch(() => {})
       router.push('/main')

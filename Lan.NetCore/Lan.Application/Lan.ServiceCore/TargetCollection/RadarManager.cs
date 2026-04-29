@@ -156,6 +156,15 @@ namespace Lan.ServiceCore.WebScoket
                 {
                     radar.Online = true;
                     OnRadarConnect(radar, true);
+
+                    if (DateTime.Now - radar.SetTime > TimeSpan.FromHours(1))
+                    {
+                        if (radar.C_NsrRadar.SetTime(DateTime.Now))
+                        {
+                            radar.SetTime = DateTime.Now;
+                        }
+                    }
+
                     Console.WriteLine(radar.Ip + "雷达连接成功");
                 }
             }
@@ -244,11 +253,7 @@ namespace Lan.ServiceCore.WebScoket
                 dic = new Dictionary<string, WRadar>();
             else
             {
-                dic = new Dictionary<string, WRadar>(allRadar.Length);
-                foreach (WRadar radar in allRadar)
-                {
-                    dic[radar.Ip.ToString()] = radar;
-                }
+                dic = allRadar.ToDictionary(static r => r.Ip.ToString());
             }
 
             return new ConcurrentDictionary<string, WRadar>(dic);

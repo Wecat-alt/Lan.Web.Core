@@ -1,6 +1,66 @@
 const LOCAL_PLAYER_WS_URL = 'ws://127.0.0.1:10088'
 const RECONNECT_DELAY = 10000
 let winIdSequence = 0
+const CREATE_WIN_GUARD_DELAY = 120
+
+let foregroundGuardBound = false
+let lastFocusAt = 0
+let lastBlurAt = 0
+let lastHiddenAt = 0
+
+function ensureForegroundGuard() {
+  if (foregroundGuardBound) {
+    return
+  }
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    foregroundGuardBound = true
+    return
+  }
+
+  window.addEventListener('focus', () => {
+    lastFocusAt = Date.now()
+  })
+
+  window.addEventListener('blur', () => {
+    lastBlurAt = Date.now()
+  })
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' || document.hidden) {
+      lastHiddenAt = Date.now()
+    }
+  })
+
+  foregroundGuardBound = true
+}
+
+function canSendCreateWinNow() {
+  if (typeof document === 'undefined') {
+    return true
+  }
+
+  const visible = document.visibilityState === 'visible' && !document.hidden
+  const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true
+  if (!visible || !hasFocus) {
+    return false
+  }
+
+  const latestBackgroundAt = Math.max(lastBlurAt, lastHiddenAt)
+  const hasFreshFocusSignal =
+    lastFocusAt > latestBackgroundAt || (latestBackgroundAt === 0 && hasFocus)
+
+  if (!hasFreshFocusSignal) {
+    return false
+  }
+
+  const now = Date.now()
+  if (lastFocusAt > 0 && now - lastFocusAt < CREATE_WIN_GUARD_DELAY) {
+    return false
+  }
+
+  return true
+}
 
 function generateWinId() {
   winIdSequence += 1
@@ -49,13 +109,6 @@ class LocalPlayerSocketClient {
         socket.onopen = () => {
           this.connectPromise = null
           this.flushPendingMessages()
-
-          try {
-            const msg = buildSetCommonInfoMessage({ language: 1 })
-            socket.send(JSON.stringify(msg))
-          } catch {
-            // ignore if builder not available or send fails
-          }
 
           resolve(socket)
         }
@@ -134,6 +187,34 @@ class LocalPlayerSocketClient {
     }
   }
 
+  sendSync(payload) {
+    const message = typeof payload === 'string' ? payload : JSON.stringify(payload)
+    const readyState = this.socket?.readyState
+
+    if (!this.isOpen()) {
+      console.warn('[LocalPlayerSocket] sendSync skipped: socket not open', {
+        readyState,
+        message: message.slice(0, 240),
+      })
+      return false
+    }
+
+    try {
+      this.socket.send(message)
+      console.warn('[LocalPlayerSocket] sendSync success', {
+        readyState,
+        message: message.slice(0, 240),
+      })
+      return true
+    } catch {
+      console.warn('[LocalPlayerSocket] sendSync failed by exception', {
+        readyState,
+        message: message.slice(0, 240),
+      })
+      return false
+    }
+  }
+
   disconnect() {
     this.shouldReconnect = false
     this.manuallyClosed = true
@@ -153,8 +234,18 @@ class LocalPlayerSocketClient {
       return
     }
 
-    const closeSocket = () => {
-      this.disconnect()
+    const closeSocket = (event) => {
+      console.warn('[LocalPlayerSocket] mark socket no-reconnect on unload event', {
+        eventType: event?.type,
+        readyState: this.socket?.readyState,
+      })
+
+      // 关闭页面时如果立刻 disconnect，会导致其它 beforeunload/pagehide 回调
+      // 中的 deleteWin 指令来不及发送。
+      // 这里只关闭重连能力，交给业务层在退出流程里先发 deleteWin。
+      this.shouldReconnect = false
+      this.manuallyClosed = true
+      this.clearReconnectTimer()
     }
 
     window.addEventListener('beforeunload', closeSocket)
@@ -164,6 +255,7 @@ class LocalPlayerSocketClient {
 }
 
 const localPlayerSocketClient = new LocalPlayerSocketClient()
+ensureForegroundGuard()
 
 function normalizeWindowOptions(windowOptions) {
   return Array.isArray(windowOptions) ? windowOptions : [windowOptions]
@@ -189,6 +281,7 @@ function normalizeCreateWinItem(options = {}) {
     width = 550,
     height = 360,
     playType = 0,
+    deviceName = '',
     rtspUrl = '',
     fileName = '',
     winType = 1,
@@ -204,6 +297,7 @@ function normalizeCreateWinItem(options = {}) {
     renderShow = '0',
     captureShow = '0',
     enableAutoStreamSwitch = '0',
+    language = 1,
   } = options
 
   return {
@@ -213,6 +307,7 @@ function normalizeCreateWinItem(options = {}) {
     width,
     height,
     playType,
+    deviceName,
     rtspUrl,
     fileName,
     winType,
@@ -228,6 +323,7 @@ function normalizeCreateWinItem(options = {}) {
     renderShow,
     captureShow,
     enableAutoStreamSwitch,
+    language,
   }
 }
 
@@ -247,31 +343,6 @@ function normalizeDeleteWinItem(options = {}) {
   return {
     winId: ensureRequiredWinId(options, 'deleteWin'),
   }
-}
-
-function normalizeSetCommonInfoItem(options = {}) {
-  const {
-    winId,
-    cmsUrl = '',
-    recordPath = '',
-    picPath = '',
-    language = 1,
-    playPerform = 1,
-  } = options
-
-  const item = {
-    cmsUrl,
-    recordPath,
-    picPath,
-    language,
-    playPerform,
-  }
-
-  if (winId) {
-    item.winId = winId
-  }
-
-  return item
 }
 
 function normalizeCreateWinItems(windowOptions) {
@@ -305,15 +376,6 @@ export function buildDeleteWinMessage(windowOptions) {
   }
 }
 
-export function buildSetCommonInfoMessage(windowOptions) {
-  const windows = normalizeWindowOptions(windowOptions)
-
-  return {
-    cmd: 'setCommonInfo',
-    data: windows.map((item) => normalizeSetCommonInfoItem(item)),
-  }
-}
-
 export function initializeLocalPlayerSocket() {
   localPlayerSocketClient.bindBeforeUnload()
   return localPlayerSocketClient.connect()
@@ -328,6 +390,10 @@ export async function sendLocalPlayerMessage(payload) {
 }
 
 export async function sendCreateWinMessage(windowOptions) {
+  if (!canSendCreateWinNow()) {
+    return false
+  }
+
   const windows = normalizeCreateWinItems(windowOptions)
   const message = {
     cmd: 'createWin',
@@ -335,24 +401,6 @@ export async function sendCreateWinMessage(windowOptions) {
   }
 
   const ok = await sendLocalPlayerMessage(message)
-
-  try {
-    const items = windows.map((item) => {
-      return {
-        winId: item.winId,
-        cmsUrl: '',
-        recordPath: '',
-        picPath: '',
-        language: 1,
-        playPerform: 1,
-      }
-    })
-
-    await sendSetCommonInfoMessage(items)
-  } catch {
-    // ignore failures for the follow-up command
-  }
-
   return ok
 }
 
@@ -362,13 +410,15 @@ export async function sendUpdateWinPosMessage(windowOptions) {
 }
 
 export async function sendDeleteWinMessage(windowOptions) {
+  console.log('sendDeleteWinMessage called with options', windowOptions)
   const message = buildDeleteWinMessage(windowOptions)
   return sendLocalPlayerMessage(message)
 }
 
-export async function sendSetCommonInfoMessage(windowOptions) {
-  const message = buildSetCommonInfoMessage(windowOptions)
-  return sendLocalPlayerMessage(message)
+export function sendDeleteWinMessageSync(windowOptions) {
+  console.log('sendDeleteWinMessageSync called with options', windowOptions)
+  const message = buildDeleteWinMessage(windowOptions)
+  return localPlayerSocketClient.sendSync(message)
 }
 
 export { LOCAL_PLAYER_WS_URL, RECONNECT_DELAY }

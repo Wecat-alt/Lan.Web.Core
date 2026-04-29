@@ -63,13 +63,13 @@
         :label="$t('camera.name')"
         align="center"
         :show-overflow-tooltip="true"
-        width="200"
+        width="150"
       />
       <!-- <el-table-column prop="name" label="绑定防区" align="center"  /> -->
       <el-table-column
         prop="ip"
         :label="$t('camera.ip')"
-        width="200"
+        width="130"
         align="center"
         :show-overflow-tooltip="true"
       >
@@ -84,7 +84,6 @@
           </el-button>
         </template>
       </el-table-column>
-      <el-table-column prop="port" :label="$t('camera.port')" align="center" width="120" />
       <el-table-column
         prop="username"
         :label="$t('camera.username')"
@@ -99,12 +98,38 @@
         :show-overflow-tooltip="true"
         width="120"
       />
+      <el-table-column :label="$t('common.online_offline')" width="140" align="center">
+        <template #default="scope">
+          <div class="status-cell">
+            <span class="pulse-dot" :class="scope.row.online ? 'online' : 'offline'"></span>
+            <span :class="scope.row.online ? 'online-text' : 'offline-text'">
+              {{ scope.row.online ? $t('common.online') : $t('common.offline') }}
+            </span>
+          </div>
+        </template>
+      </el-table-column>
+
+      <el-table-column
+        prop="manufacturer"
+        :label="$t('camera.manufacturer')"
+        align="center"
+        :show-overflow-tooltip="true"
+        width="180"
+      />
+      <el-table-column
+        prop="deviceTypeName"
+        :label="$t('camera.deviceTypeName')"
+        align="center"
+        :show-overflow-tooltip="true"
+        width="200"
+      />
+
       <el-table-column
         prop="cameraHeight"
         :label="$t('camera.cameraHeight')"
         align="center"
         :show-overflow-tooltip="true"
-        width="200"
+        width="120"
       />
       <el-table-column
         prop="cameraURL"
@@ -850,5 +875,47 @@ export default {
 
 .custom-red-form {
   --el-text-color-regular: red;
+}
+
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.pulse-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.pulse-dot.online {
+  background-color: #67c23a;
+}
+
+.pulse-dot.offline {
+  background-color: #f56c6c;
+}
+
+.online-text {
+  color: #67c23a;
+}
+
+.offline-text {
+  color: #f56c6c;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 </style>

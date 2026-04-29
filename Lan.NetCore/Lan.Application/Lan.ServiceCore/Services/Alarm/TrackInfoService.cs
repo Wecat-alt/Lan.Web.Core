@@ -31,35 +31,30 @@ namespace Lan.ServiceCore.Services
 
         public Dictionary<int, object> GetTrackInfoByAlarmId(TrackInfoQueryDto parm)
         {
+            var alarm = Db.Queryable<AlarmModel>().First(x => x.Id == parm.AlarmId);
+            if (alarm == null)
+            {
+                return new Dictionary<int, object>();
+            }
 
-            // 然后根据排序后的 TrackId 获取数据并去重
-            var TargetIDs = Queryable()
-                .InnerJoin<AlarmModel>((t, a) => t.AreaId == a.AreaId
-                    && a.Id == parm.AlarmId
-                    && t.UpdateTime >= a.DateTime
-                         && t.UpdateTime <= SqlFunc.DateAdd(a.DateTime, 15, DateType.Second))
-
-                    .Select(t => t.TargetId)
-                    .Distinct()
-                    .ToList();
-
-
-
+            // 保持原业务：按告警时间窗(15秒)取目标ID
+            var targetIds = QueryTrackInfoByTimeRange(alarm.DateTime, alarm.DateTime.AddSeconds(15), alarm.AreaId)
+                .Select(t => t.TargetId)
+                .Distinct()
+                .ToList();
 
             Dictionary<int, object> dic = new();
 
-            TargetIDs.ForEach(t =>
+            var queryStartTime = DateTime.Parse(parm.Time);
+            var queryEndTime = queryStartTime.AddSeconds(15);
+
+            targetIds.ForEach(t =>
             {
                 List<JObject> keyValuePairs = new List<JObject>();
 
-
-                var tt
-                = Queryable()
-
-                     .Where(x => x.AreaId == parm.AreaId && x.TargetId == t && x.UpdateTime >= DateTime.Parse(parm.Time)
-                         && x.UpdateTime <= SqlFunc.DateAdd(DateTime.Parse(parm.Time) , 15, DateType.Second))
-                     .OrderBy(u => u.TrackId)
-                     .ToList();
+                var tt = QueryTrackInfoByTimeRange(queryStartTime, queryEndTime, parm.AreaId, t)
+                    .OrderBy(u => u.TrackId)
+                    .ToList();
 
                 tt.ForEach(item =>
                 {
@@ -70,17 +65,67 @@ namespace Lan.ServiceCore.Services
                         postJson["lng"] = item.Lng;
                         keyValuePairs.Add(postJson);
 
-                        if (TargetIDs.Count == 1)
+                        if (targetIds.Count == 1)
                         {
                             keyValuePairs.Add(postJson);
                         }
                     }
                 });
                 dic.Add(t, keyValuePairs);
-
             });
-            return dic;
 
+            return dic;
+        }
+
+        private List<TrackInfo> QueryTrackInfoByTimeRange(DateTime startTime, DateTime endTime, int areaId, int? targetId = null)
+        {
+            if (startTime > endTime)
+            {
+                (startTime, endTime) = (endTime, startTime);
+            }
+
+            var tableNames = GetTrackInfoTableNames(startTime, endTime);
+            var result = new List<TrackInfo>();
+
+            foreach (var tableName in tableNames)
+            {
+                if (!Db.DbMaintenance.IsAnyTable(tableName, false))
+                    continue;
+
+                var query = Db.Queryable<TrackInfo>()
+                    .AS(tableName)
+                    .Where(x => x.AreaId == areaId)
+                    .Where(x => x.UpdateTime >= startTime && x.UpdateTime <= endTime);
+
+                if (targetId.HasValue)
+                {
+                    query = query.Where(x => x.TargetId == targetId.Value);
+                }
+
+                result.AddRange(query.ToList());
+            }
+
+            return result;
+        }
+
+        private static List<string> GetTrackInfoTableNames(DateTime startTime, DateTime endTime)
+        {
+            if (startTime > endTime)
+            {
+                (startTime, endTime) = (endTime, startTime);
+            }
+
+            var names = new List<string>();
+            var cursor = new DateTime(startTime.Year, startTime.Month, 1);
+            var endCursor = new DateTime(endTime.Year, endTime.Month, 1);
+
+            while (cursor <= endCursor)
+            {
+                names.Add($"trackinfo{cursor:yyyyMM}");
+                cursor = cursor.AddMonths(1);
+            }
+
+            return names;
         }
     }
 }

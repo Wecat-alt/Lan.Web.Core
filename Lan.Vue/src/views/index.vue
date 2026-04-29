@@ -12,7 +12,7 @@
 
           <a href="/play.rar" download="play.rar">Download</a>
           <el-icon><Avatar /></el-icon>
-          <span>admin</span>
+          <span>{{ username }}</span>
           <LanguageSwitcher />
         </div>
       </div>
@@ -29,7 +29,9 @@
 </template>
 
 <script>
-import { defineComponent, onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import { canAccessMenu, getAuthProfile } from '@/utils/permission'
+import { ensureSignalRConnection, setSignalRReceiveEnabled } from '@/utils/signalRUtils'
+import { defineComponent, getCurrentInstance, onBeforeUnmount, onMounted, shallowRef } from 'vue'
 
 import AppSidebar from '../components/AppSidebar.vue'
 import Home from '../views/Home.vue'
@@ -57,8 +59,8 @@ export default defineComponent({
     LanguageSwitcher,
   },
   setup() {
+    const { proxy } = getCurrentInstance()
     //const { t } = useI18n()
-    const currentView = shallowRef(realtime_map)
     const views = {
       home: Home,
       defencearea: defencearea,
@@ -76,7 +78,41 @@ export default defineComponent({
       LanguageSwitcher: LanguageSwitcher,
     }
 
+    const menuCandidates = [
+      'realtime_map',
+      'wizard',
+      'radar',
+      'camera',
+      'defencearea',
+      'alarm',
+      'calibration',
+      'config',
+      'autoMap',
+      'livePreview',
+    ]
+
+    const resolveFirstAllowedMenu = () => {
+      const first = menuCandidates.find((item) => canAccessMenu(item))
+      return first || 'realtime_map'
+    }
+
+    const currentView = shallowRef(views[resolveFirstAllowedMenu()] || realtime_map)
+    const signalRApi = window.__APP_CONFIG__.VITE_SIGNALR_URL
+
+    const updateSignalRReceiveState = (viewKey) => {
+      // 主页不消费实时数据，业务菜单开启消费
+      setSignalRReceiveEnabled(viewKey !== 'home')
+    }
+
+    const authProfile = getAuthProfile()
+    const username = authProfile.username || 'user'
+
     const handleMenuChange = (view) => {
+      if (!canAccessMenu(view) && view !== 'wizard') {
+        proxy.$modal && proxy.$modal.msgError && proxy.$modal.msgError('无权限访问该菜单')
+        return
+      }
+
       // wizard flow: use localStorage wizard key to control next step
       const wizardStep = localStorage.getItem('wizard')
       // 打开 livePreview 为单独窗口
@@ -87,10 +123,12 @@ export default defineComponent({
 
       if (view === 'radar' && wizardStep) {
         currentView.value = views['radar'] || realtime_map
+        updateSignalRReceiveState('radar')
         return
       }
 
       currentView.value = views[view] || realtime_map
+      updateSignalRReceiveState(view)
     }
 
     const wizardHandler = (e) => {
@@ -101,6 +139,11 @@ export default defineComponent({
     }
 
     onMounted(() => {
+      if (signalRApi) {
+        ensureSignalRConnection({ api: signalRApi })
+      }
+
+      updateSignalRReceiveState(resolveFirstAllowedMenu())
       window.addEventListener('wizard-next', wizardHandler)
     })
 
@@ -110,6 +153,7 @@ export default defineComponent({
 
     return {
       currentView,
+      username,
       handleMenuChange,
     }
   },

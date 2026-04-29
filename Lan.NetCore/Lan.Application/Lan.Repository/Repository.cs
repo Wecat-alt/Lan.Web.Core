@@ -13,6 +13,7 @@ namespace Lan.Repository
 {
     public class Repository<T> : DbContext<T> where T : class, new()
     {
+        private static readonly object TrackInfoTableCreateLock = new();
         //private readonly ISqlSugarClient _db;
         public Repository(ISqlSugarClient db = null)
         {
@@ -66,8 +67,42 @@ namespace Lan.Repository
             if (batch == null || batch.Count == 0)
                 return 0;
 
-            var result = await Db.Insertable(batch).ExecuteCommandAsync();
-            return result;
+            var total = 0;
+            var groups = batch.GroupBy(x => x.UpdateTime.ToString("yyyyMM"));
+            foreach (var group in groups)
+            {
+                var tableName = $"trackinfo{group.Key}";
+                EnsureTrackInfoMonthlyTable(tableName);
+                total += await Db.Insertable(group.ToList()).AS(tableName).ExecuteCommandAsync();
+            }
+
+            return total;
+        }
+
+        protected void EnsureTrackInfoMonthlyTable(string tableName)
+        {
+            if (Db.DbMaintenance.IsAnyTable(tableName, false))
+            {
+                return;
+            }
+ 
+            lock (TrackInfoTableCreateLock)
+            {
+                if (Db.DbMaintenance.IsAnyTable(tableName, false))
+                {
+                    return;
+                }
+
+                const string baseTableName = "trackinfo";
+                if (Db.DbMaintenance.IsAnyTable(baseTableName, false))
+                {
+                    Db.Ado.ExecuteCommand($"CREATE TABLE `{tableName}` LIKE `{baseTableName}`");
+                }
+                else
+                {
+                    Db.CodeFirst.As<TrackInfo>(tableName).InitTables<TrackInfo>();
+                }
+            }
         }
 
         public int SqlCommand(string sql)

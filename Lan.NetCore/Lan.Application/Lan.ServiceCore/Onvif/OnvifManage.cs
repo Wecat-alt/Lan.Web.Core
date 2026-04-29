@@ -1,6 +1,7 @@
-﻿using Lan.Infrastructure.Cache;
-using Lan.Infrastructure.CameraOnvif;
+﻿using Lan.Infrastructure.CameraOnvif;
 using Lan.ServiceCore.Services;
+using MemoryCache.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Model;
 using System.Collections.Concurrent;
 using System.Text;
@@ -9,14 +10,21 @@ using static Azure.Core.HttpHeader;
 
 namespace Lan.ServiceCore.Onvif
 {
-    public class OnvifManage
+    public interface IOnvifManage
     {
-        static ONVIF_MANAGEMENT_CAPABILITIES capabilities = new ONVIF_MANAGEMENT_CAPABILITIES();
+        void Init();
+    }
 
-        public static void Init()
+    public class OnvifManage : IOnvifManage
+    {
+        private ONVIF_MANAGEMENT_CAPABILITIES capabilities = new ONVIF_MANAGEMENT_CAPABILITIES();
+
+        private readonly IMemoryCacheService _cache;
+        public OnvifManage(IMemoryCacheService cache) { _cache = cache; }
+
+        public void Init()
         {
-            CameraService cameraService = new CameraService();
-            List<CameraModel> listCamera = cameraService.GetAllList();
+            List<CameraModel> listCamera = new CameraService().GetAllList();
 
             if (listCamera is { Count: > 0 })
             {
@@ -36,23 +44,13 @@ namespace Lan.ServiceCore.Onvif
                                 onvifUrls = capabilities.onvifUrls,
                                 sourceToken = v.SourceToken,
                             };
-
-                            //ONVIF_DEVICE_INFO oNVIF_DEVICE_INFO = new ONVIF_DEVICE_INFO();
-                            //ret = onvifsdk.ONVIF_MAGEMENT_GetDeviceInformation(2000, ref oNVIF_COMMON_INFO, ref oNVIF_DEVICE_INFO);
-                            //string a = Encoding.Default.GetString(oNVIF_DEVICE_INFO.firmwareVersion).TrimEnd('\0');
-                            //string b = Encoding.Default.GetString(oNVIF_DEVICE_INFO.hardwareId).TrimEnd('\0'); ;
-                            //string c = Encoding.Default.GetString(oNVIF_DEVICE_INFO.manufacturer).TrimEnd('\0');
-                            //string d = Encoding.Default.GetString(oNVIF_DEVICE_INFO.model).TrimEnd('\0');
-                            //string e = Encoding.Default.GetString(oNVIF_DEVICE_INFO.serialNumber).TrimEnd('\0');
-                            //string aa = ret.ToString();
-
-                            MemoryCacheHelper.Set(v.Ip, oNVIF_COMMON_INFO);
-                            //var session = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(v.Ip);
+                            //MemoryCacheHelper.Set(v.Ip, oNVIF_COMMON_INFO);
+                            _cache.Set(v.Ip, oNVIF_COMMON_INFO);
+                            //var session = _cache.Get<ONVIF_COMMON_INFO>(v.Ip);
                         }
                     }
                 }
             }
         }
-
     }
 }

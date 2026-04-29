@@ -168,7 +168,13 @@ export class TrackManager {
   // 更新标记弹窗内容
   _updateMarkerPopup(marker, targetData) {
     const content = this._createPopupContent(targetData)
-    marker.bindPopup(content)
+    const popup = marker.getPopup()
+
+    if (popup) {
+      popup.setContent(content)
+    } else {
+      marker.bindPopup(content)
+    }
 
     // 如果是被跟踪的目标，自动打开弹窗
     if (this.trackTargetId === targetData.targetId) {

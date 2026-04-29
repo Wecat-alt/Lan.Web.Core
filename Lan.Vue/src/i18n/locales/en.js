@@ -36,12 +36,15 @@ export default {
     online_offline: 'Online/Offline',
     online: 'Online',
     offline: 'Offline',
+    Selected: 'Selected',
     Alarm_Area: 'Alarm Area',
     Filter_Area: 'Filter Area',
     Warning_Area: 'Warning Area',
     Auto_Calibration: 'Auto Calibration',
     Cancel_Drawing: 'Cancel Drawing',
     Drawing: 'Drawing...',
+    select: 'Please select',
+    Draw_Area: 'Draw Area',
   },
 
   // Navigation
@@ -116,6 +119,8 @@ export default {
     tiltBottom: 'Tilt Bottom',
     tiltTopAngle: 'T Top Angle',
     tiltBottomAngle: 'T Bot Angle',
+    manufacturer: 'Vendor',
+    deviceTypeName: 'Device Type',
   },
   zone: {
     id: 'No.',
@@ -223,6 +228,9 @@ export default {
 
     checkLogin: 'Login failed. Please check your username and password.',
     regionType: 'Select region type',
+    checkZone:
+      'When "All" is selected for zone, saving is not allowed. Please select a specific zone.',
+    checkZoneSave: 'Please select a zone before saving.',
   },
 
   // Page Titles

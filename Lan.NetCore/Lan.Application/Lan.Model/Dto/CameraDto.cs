@@ -83,5 +83,6 @@ namespace Lan.Dto
 
         public int CameraId { get; set; }
         public string SourceToken { get; set; }
+        public string ZoneName { get; set; }
     }
 }

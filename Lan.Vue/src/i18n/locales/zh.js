@@ -36,12 +36,15 @@ export default {
     online_offline: '在线/离线',
     online: '在线',
     offline: '离线',
+    Selected: '已选择',
     Alarm_Area: '报警区域',
     Filter_Area: '过滤区域',
     Warning_Area: '预警区域',
     Auto_Calibration: '自动校准',
     Cancel_Drawing: '取消绘制',
     Drawing: '正在绘制...',
+    select: '请选择',
+    Draw_Area: '绘制区域',
   },
 
   // 导航菜单
@@ -119,6 +122,8 @@ export default {
     tiltBottom: '垂直下',
     tiltTopAngle: '垂直上角度',
     tiltBottomAngle: '垂直下角度',
+    manufacturer: '厂商',
+    deviceTypeName: '设备类型',
   },
   zone: {
     id: '防区编号',
@@ -138,6 +143,7 @@ export default {
     angle: '角度：',
     speed: '速度：',
     map_msg: '地图信息设置',
+    cameraPreview: '相机预览',
   },
   autoMap: {
     title: '地图下载',
@@ -227,6 +233,8 @@ export default {
 
     checkLogin: '用户登录失败，请检查用户名和密码！',
     regionType: '请选择区域类型！',
+    checkZone: '防区选择“全部”时不允许保存，请选择具体防区',
+    checkZoneSave: '请选择防区后再保存',
   },
 
   // 页面标题

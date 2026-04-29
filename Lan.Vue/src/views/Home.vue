@@ -67,10 +67,11 @@
   </div>
 </template>
 
-<script>
-import * as echarts from 'echarts' // 导入echarts模块
+<script setup>
+import * as echarts from 'echarts'
+import { onBeforeUnmount, onMounted } from 'vue'
 
-const echartsRef = ref(null)
+let resizeHandler = null
 
 const initCharts = () => {
   // 柱状图
@@ -253,16 +254,25 @@ const initCharts = () => {
   radarChart.setOption(radarOption)
 
   // 响应式调整
-  window.addEventListener('resize', function () {
+  resizeHandler = function () {
     barChart.resize()
     lineChart.resize()
     pieChart.resize()
     radarChart.resize()
-  })
+  }
+
+  window.addEventListener('resize', resizeHandler)
 }
 
 onMounted(() => {
   initCharts()
+})
+
+onBeforeUnmount(() => {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
 })
 </script>
 

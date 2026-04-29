@@ -10,6 +10,7 @@
     <Compile Remove="app\AppSettingsService.cs" />
     <Compile Remove="app\IAppSettingsService.cs" />
     <Compile Remove="app\InternalApp.cs" />
+    <Compile Remove="Cache\MemoryCacheHelper.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +21,11 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="WeCat.MemoryCache.Core" Version="1.0.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Cache\" />
   </ItemGroup>
 
 

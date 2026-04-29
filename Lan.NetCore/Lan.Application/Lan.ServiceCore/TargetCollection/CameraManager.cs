@@ -41,11 +41,7 @@ namespace Lan.ServiceCore.TargetCollection
                 dic = new Dictionary<int, WCamera>();
             else
             {
-                dic = new Dictionary<int, WCamera>(allCamera.Length);
-                foreach (WCamera camera in allCamera)
-                {
-                    dic[camera.ID] = camera;
-                }
+                dic = allCamera.ToDictionary(static c => c.ID);
             }
 
             return new ConcurrentDictionary<int, WCamera>(dic);
@@ -104,16 +100,6 @@ namespace Lan.ServiceCore.TargetCollection
             }
         }
 
-        public WCamera GetLastCamera()
-        {
-            //int lastId = CameraDatabase.GetMaxId();
-            //WCamera camera;
-            //if (_dictCameras.TryGetValue(lastId, out camera))
-            //    return camera;
-            //else
-            return null;
-        }
-
         public void Dispose()
         {
             if (_dictCameras != null)
@@ -126,89 +112,6 @@ namespace Lan.ServiceCore.TargetCollection
             }
             //throw new NotImplementedException();
         }
-
-
-        #region 相机登录线程
-        //控制线程
-        System.Threading.Thread _thCameraConnect;
-        //线程运行状态
-        bool _bThreadRunning = false;
-
-        //开启线程
-        public bool CameraConnectThreadStart()
-        {
-            try
-            {
-                _bThreadRunning = true;
-                _thCameraConnect = new System.Threading.Thread(CameraConnectThreadRun);
-                _thCameraConnect.IsBackground = true;
-                _thCameraConnect.Name = "相机连接线程";
-                _thCameraConnect.Start();
-                //Log.Debug(_thCameraConnect.Name + "_已开启");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                //Log.Error(ex.ToString());
-                return false;
-            }
-        }
-
-        //等待线程结束
-        public bool CameraConnectThreadStop()
-        {
-            try
-            {
-                if (_thCameraConnect != null)
-                {
-                    _bThreadRunning = false;
-                    //停止线程
-                    _thCameraConnect.Join();//等待线程停止
-                    //Log.Debug(_thCameraConnect.Name + "_已停止");
-                    _thCameraConnect = null;
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                //Log.Error(ex.ToString());
-                return false;
-            }
-        }
-
-        //控制线程
-        void CameraConnectThreadRun()
-        {
-            // Log.Debug(_thCameraConnect.Name + "_已开启");
-            int currIndex = 0;
-            WCamera camera;
-            //System.Threading.Thread.Sleep(1000);
-            //登录所有相机
-            foreach (WCamera ca in _dictCameras.Values)
-            {
-
-            }
-            System.Threading.Thread.Sleep(2000);
-            while (_bThreadRunning)
-            {
-                System.Threading.Thread.Sleep(100);
-
-                try
-                {
-
-                }
-                catch (Exception ex)
-                {
-                    //Log.Error(ex.ToString());
-                }
-            }
-            //Log.Debug(_thCameraConnect.Name + "_运行结束");
-        }
-
-
-
-        #endregion
 
         #region ICollection成员
 

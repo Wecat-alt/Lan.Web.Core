@@ -11,6 +11,7 @@ using Lan.ServiceCore.WebScoket;
 using Model;
 using NetTopologySuite.Index.HPRtree;
 using SqlSugar;
+using WebSocketSharp;
 
 namespace Lan.ServiceCore.Services
 {
@@ -46,14 +47,19 @@ namespace Lan.ServiceCore.Services
                     RadarType = u.RadarType,
 
                     DefenceEnable = c.DefenceEnable,
-
+                    Online = false,
                     CameraIp = d.Ip,
                     Username = d.Username,
                     Password = d.Password,
                     CameraURL = d.CameraURL,
                 })
                 .ToList();
-
+            var radarManager = RadarManager.GetInstance();
+            foreach (var radar in response)
+            {
+                var radarStatus = radarManager[radar.Ip];
+                radar.Online = radarStatus?.Online ?? false;
+            }
             return response;
         }
 
@@ -63,6 +69,31 @@ namespace Lan.ServiceCore.Services
 
             return predicate;
         }
+
+        public List<RadarModel> GetListALL() => Queryable()
+                .LeftJoin<DefenceareaModel>((u, c) => u.BindingAreaId == c.Id)  // 修正：包含所有已连接的表
+                .LeftJoin<CameraModel>((u, c, d) => c.Id == d.BindingAreaId)  // 修正：包含所有已连接的表
+                .Select((u, c, d) => new RadarModel
+                {
+                    Id = u.Id,
+                    BindingAreaId = u.BindingAreaId,
+                    Ip = u.Ip,
+                    Port = u.Port,
+                    Status = u.Status,
+                    Latitude = u.Latitude,
+                    Longitude = u.Longitude,
+                    NorthDeviationAngle = u.NorthDeviationAngle,
+                    DefenceRadius = u.DefenceRadius,
+                    DefenceAngle = u.DefenceAngle,
+                    RadarType = u.RadarType,
+
+                    DefenceEnable = c.DefenceEnable,
+                    Online = false,
+                    CameraIp = d.Ip,
+                    Username = d.Username,
+                    Password = d.Password,
+                    CameraURL = d.CameraURL,
+                }).ToList();
 
         public RadarModel GetInfo(int Id) => Queryable().Where(x => x.Id == Id).First();
         public RadarModel GetInfo(string Ip) => Queryable().Where(x => x.Ip == Ip).First();

@@ -1,6 +1,6 @@
-﻿using Lan.Dto;
-using Lan.Infrastructure.Cache;
+using Lan.Dto;
 using Lan.Infrastructure.CameraOnvif;
+using MemoryCache.Core;
 using Microsoft.AspNetCore.Mvc;
 using Model;
 using System.Text;
@@ -12,9 +12,11 @@ namespace Lan.Application.Controllers
     public class CameraController : BaseController
     {
         public readonly ICameraService _CameraService;
-        public CameraController(ICameraService cameraService)
+        private readonly IMemoryCacheService _cache;
+        public CameraController(ICameraService cameraService, IMemoryCacheService cache)
         {
             _CameraService = cameraService;
+            _cache = cache;
         }
 
         [HttpGet("list")]
@@ -22,6 +24,14 @@ namespace Lan.Application.Controllers
         {
             var response = _CameraService.GetList(parm);
             return Message(response);
+        }
+
+        [HttpGet("preview")]
+        public async Task<IActionResult> GetCameraPreview()
+        {
+            var response = await _CameraService.GetListPreviewAsync();
+            var info = response.Adapt<List<CameraDto>>();
+            return Message(info);
         }
 
         [HttpGet("{Id}")]
@@ -66,7 +76,8 @@ namespace Lan.Application.Controllers
                     }
                 }
 
-                MemoryCacheHelper.Set(parm.Ip, common);
+                //MemoryCacheHelper.Set(parm.Ip, common);
+                _cache.Set(parm.Ip, common);
             }
 
             parm.CameraURL = strCameraURL;

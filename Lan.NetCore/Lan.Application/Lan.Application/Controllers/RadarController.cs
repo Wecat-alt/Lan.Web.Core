@@ -24,6 +24,13 @@ namespace Lan.Application.Controllers
             return Message(response);
         }
 
+        [HttpGet("all")]
+        public IActionResult QueryRadarAll()
+        {
+            var response = _RadarService.GetListALL();
+            return Message(response);
+        }
+
         [HttpGet("{Id}")]
         public IActionResult GetRadar(int Id)
         {

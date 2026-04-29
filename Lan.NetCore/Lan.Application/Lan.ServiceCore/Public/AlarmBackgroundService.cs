@@ -2,10 +2,13 @@
 using Lan.Infrastructure;
 using Lan.ServiceCore.IService;
 using Lan.ServiceCore.Services;
+using Lan.ServiceCore.Signalr;
 using Lan.ServiceCore.TargetCollection;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Model;
+using Newtonsoft.Json;
 using SqlSugar;
 using System;
 using System.Collections.Concurrent;
@@ -21,8 +24,10 @@ namespace Lan.ServiceCore.Public
     public class AlarmBackgroundService : BackgroundService
     {
         AlarmService alarmService = new AlarmService();
+        CameraService cameraService = new CameraService();
 
         private readonly ILogger<AlarmBackgroundService> _logger;
+        private readonly IHubContext<MessageHub> _messageHub;
         private readonly BlockingCollection<AlarmEvent> _alarmQueue = new();
         private readonly ConcurrentDictionary<string, ActiveAlarmInfo> _activeAlarms = new();
         private readonly ConcurrentDictionary<string, VideoRecordingInfo> _videoRecordings = new();
@@ -52,10 +57,11 @@ namespace Lan.ServiceCore.Public
             public bool IsRecording { get; set; } // 是否正在录像
         }
 
-        public AlarmBackgroundService(ILogger<AlarmBackgroundService> logger)
+        public AlarmBackgroundService(ILogger<AlarmBackgroundService> logger, IHubContext<MessageHub> messageHub)
         {
             _instance = this; // 设置静态实例
             _logger = logger;
+            _messageHub = messageHub;
         }
 
         public void Write(AlarmEvent alarmEvent)
@@ -192,18 +198,53 @@ namespace Lan.ServiceCore.Public
                     LastRecordTime = alarmInfo.LastDataTime,
                     RadarIp = alarmInfo.RadarIp,
                     IsActive = isEnd ? "false" : "true",
-                    VideoName = alarmInfo.CurrentVideoName, // 保存录像文件名
+                    VideoName = alarmInfo.CurrentVideoName,
                     CameraIp = GetCameraIpForZone(zoneId),
                     Latitude = _defenceArea.Latitude,
                     Longitude = _defenceArea.Longitude,
                 };
-                // 保存到数据库
+
                 alarmService.AddAlarm(newRecord);
+                SendAlarmPopupIfValid(newRecord);
 
                 _logger.LogDebug($"生成报警记录: 防区 {zoneId}, 记录时间: {now}, 录像文件: {alarmInfo.CurrentVideoName}, 结束标记: {isEnd}");
             }
+        }
 
-           
+        private void SendAlarmPopupIfValid(AlarmModel newRecord)
+        {
+            var cameraInfo = string.IsNullOrWhiteSpace(newRecord.CameraIp)
+                ? null
+                : cameraService.GetInfo(newRecord.CameraIp);
+
+            var canSendPopup = cameraInfo != null
+                && !string.IsNullOrWhiteSpace(cameraInfo.Ip)
+                && !string.IsNullOrWhiteSpace(cameraInfo.Username)
+                && !string.IsNullOrWhiteSpace(cameraInfo.Password)
+                && !string.IsNullOrWhiteSpace(cameraInfo.CameraURL);
+
+            if (!canSendPopup)
+            {
+                _logger.LogWarning("报警弹窗未发送：相机信息不存在或字段为空，AreaId: {AreaId}, CameraIp: {CameraIp}", newRecord.AreaId, newRecord.CameraIp);
+                return;
+            }
+
+            var popupJson = JsonConvert.SerializeObject(new
+            {
+                CameraIp = cameraInfo.Ip,
+                Username = cameraInfo.Username,
+                Password = cameraInfo.Password,
+                CameraURL = cameraInfo.CameraURL
+            });
+
+            _ = _messageHub.Clients.All.SendAsync("AlarmPopup", popupJson)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted && t.Exception != null)
+                    {
+                        _logger.LogError(t.Exception, "发送报警弹窗消息失败");
+                    }
+                });
         }
 
         /// <summary>

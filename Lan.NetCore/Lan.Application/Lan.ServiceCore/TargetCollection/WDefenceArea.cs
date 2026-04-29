@@ -1,10 +1,11 @@
 ﻿using Dm.util;
-using Lan.Infrastructure.Cache;
+using Infrastructure;
 using Lan.Infrastructure.CameraOnvif;
 using Lan.ServiceCore.Onvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services;
 using Lan.ServiceCore.WebScoket;
+using MemoryCache.Core;
 using Model;
 using NetTopologySuite.Geometries;
 using Newtonsoft.Json;
@@ -29,6 +30,9 @@ namespace Lan.ServiceCore.TargetCollection
     /// </summary>
     public class WDefenceArea : IDisposable
     {
+
+        private readonly IMemoryCacheService? _cache;
+
         #region 成员变量
         AlarmService alarmService = new AlarmService();
 
@@ -179,6 +183,7 @@ namespace Lan.ServiceCore.TargetCollection
 
         public WDefenceArea()
         {
+            _cache = App.GetService<IMemoryCacheService>();
             _lastTarget = null;
             //_maxFilter = new MaxFilter();
             _lastManualControlTime = _cameraSwitchTargetEndTime = _trackTime = DateTime.Now;
@@ -203,6 +208,7 @@ namespace Lan.ServiceCore.TargetCollection
         internal WDefenceArea(DefenceareaModel defencearea)
             : this()
         {
+            _cache = App.GetService<IMemoryCacheService>();
             _nID = defencearea.Id;
             _name = defencearea.Name;
 
@@ -232,13 +238,13 @@ namespace Lan.ServiceCore.TargetCollection
             //RadarDefenceEnable();
             DrawPolygonService drawPolygonService = new DrawPolygonService();
 
-            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(1);
+            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 1);
             ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
 
-            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(2);
+            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 2);
             ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
 
-            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(3);
+            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 3);
             ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
 
         }
@@ -251,13 +257,13 @@ namespace Lan.ServiceCore.TargetCollection
 
             DrawPolygonService drawPolygonService = new DrawPolygonService();
 
-            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(1);
+            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 1);
             ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
 
-            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(2);
+            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 2);
             ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
 
-            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(3);
+            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 3);
             ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
         }
 
@@ -504,9 +510,13 @@ namespace Lan.ServiceCore.TargetCollection
                     continue;
                 }
 
-                if (MemoryCacheHelper.Exists("RBTrack"))
+                //if (MemoryCacheHelper.Exists("RBTrack"))
+                //{
+                //    _list_RBTRACK = MemoryCacheHelper.Get<List<RBTRACK_Info>>("RBTrack");
+                //}
+                if (_cache?.Exists("RBTrack") == true)
                 {
-                    _list_RBTRACK = MemoryCacheHelper.Get<List<RBTRACK_Info>>("RBTrack");
+                    _list_RBTRACK = _cache.Get<List<RBTRACK_Info>>("RBTrack");
                 }
 
                 int channelId = -1;

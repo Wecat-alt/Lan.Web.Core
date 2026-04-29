@@ -1,14 +1,20 @@
 //import tab from './tab'
-//import auth from './auth'
+import auth from './auth'
 //import cache from './cache'
 import modal from './modal'
 //import download from './download'
+
+function removeEl(el) {
+  if (el && el.parentNode) {
+    el.parentNode.removeChild(el)
+  }
+}
 
 export default function installPlugins(app) {
   // // 页签操作
   // app.config.globalProperties.$tab = tab
   // // 认证对象
-  // app.config.globalProperties.$auth = auth
+  app.config.globalProperties.$auth = auth
   // // 缓存对象
   // app.config.globalProperties.$cache = cache
   // 模态框对象
@@ -24,4 +30,22 @@ export default function installPlugins(app) {
     }
     return true
   }
+
+  app.directive('hasPermi', {
+    mounted(el, binding) {
+      const permissions = binding.value || []
+      const passed = Array.isArray(permissions)
+        ? auth.hasPermiOr(permissions)
+        : auth.hasPermi(permissions)
+      if (!passed) removeEl(el)
+    },
+  })
+
+  app.directive('hasRole', {
+    mounted(el, binding) {
+      const roles = binding.value || []
+      const passed = Array.isArray(roles) ? auth.hasRoleOr(roles) : auth.hasRole(roles)
+      if (!passed) removeEl(el)
+    },
+  })
 }

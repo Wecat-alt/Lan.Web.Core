@@ -1,8 +1,10 @@
-﻿using Lan.Infrastructure.Cache;
+﻿
+using Infrastructure;
 using Lan.Infrastructure.CameraOnvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services;
 using Lan.ServiceCore.Signalr;
+using MemoryCache.Core;
 using Model;
 using NetTopologySuite.Index.HPRtree;
 using SqlSugar.IOC;
@@ -24,6 +26,10 @@ namespace Lan.ServiceCore.Onvif
         static CameraService cameraService = new CameraService();
         CalibrationService calibrationService = new CalibrationService();
         private static RBTrackSdk.TrackCallBack _TrackCallBack;
+
+        private static readonly IMemoryCacheService? _cache = App.GetService<IMemoryCacheService>();
+
+
         public static void Init()
         {
             GlobalVariable.TrackStatus = false;
@@ -38,7 +44,7 @@ namespace Lan.ServiceCore.Onvif
         }
         private static void LoadONVIF_RBTRACK()
         {
-            if (MemoryCacheHelper.Exists("RBTrack"))
+            if (_cache.Exists("RBTrack"))
             {
                 if (list_RBTRACK.Count > 0)
                 {
@@ -48,7 +54,7 @@ namespace Lan.ServiceCore.Onvif
                     }
                     list_RBTRACK = new List<RBTRACK_Info>();
                 }
-                MemoryCacheHelper.Remove("RBTrack");
+                _cache.Remove("RBTrack");
             }
             List<CameraModel> cameraBuffers = cameraService.GetAllList();
 
@@ -149,14 +155,15 @@ namespace Lan.ServiceCore.Onvif
                     }
                 }
                 if (list_RBTRACK.Count > 0)
-                    MemoryCacheHelper.Set("RBTrack", list_RBTRACK);
+                {
+                    _cache.Set("RBTrack", list_RBTRACK);
+                }
             }
         }
         private static int TrackCallBack(int channelId, ref RADAR_TARGETS_T target, IntPtr userPtr)
         {
             try
             {
-                //Console.WriteLine($"TrackCallBack: channelId={channelId}, targetId={target.targetId}, type={target.type}, cod_X={target.cod_X}, cod_Y={target.cod_Y}");
                 TrackTarget.AddTrackTarget(target.targetId);
             }
             catch

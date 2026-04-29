@@ -1,26 +1,10 @@
-﻿using Infrastructure;
-using Lan.Dto;
-using Lan.Infrastructure.Cache;
 using Lan.Infrastructure.CameraOnvif;
-using Lan.Model;
-using Lan.Repository;
 using Lan.ServiceCore.IService;
-using Lan.ServiceCore.Onvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services.Base;
 using Lan.ServiceCore.TargetCollection;
-using Lan.ServiceCore.WebScoket;
-using Model;
-using SqlSugar;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
+using MemoryCache.Core;
 using System.Text;
-using System.Threading.Tasks;
-using static Azure.Core.HttpHeader;
 
 namespace Lan.ServiceCore.Services
 {
@@ -28,9 +12,10 @@ namespace Lan.ServiceCore.Services
     public class CameraService : Repository<CameraModel>, ICameraService
     {
         ONVIF_COMMON_INFO common = new ONVIF_COMMON_INFO();
-        public CameraService()
+        private readonly IMemoryCacheService? _cache;
+        public CameraService(IMemoryCacheService? cache = null)
         {
-
+            _cache = cache;
         }
 
         public List<CameraModel> GetList(CameraQueryDto parm)
@@ -44,6 +29,24 @@ namespace Lan.ServiceCore.Services
             var response = Queryable()
                 .Where(exp.ToExpression()).ToList();
 
+            foreach (var camera in response)
+            {
+                //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(camera.Ip);
+                common = _cache.Get<ONVIF_COMMON_INFO>(camera.Ip);
+                ONVIF_DEVICE_INFO oNVIF_DEVICE_INFO = new ONVIF_DEVICE_INFO();
+                int ret = onvifsdk.ONVIF_MAGEMENT_GetDeviceInformation(10, ref common, ref oNVIF_DEVICE_INFO);
+                if (ret == 0)
+                {
+                    camera.Online = true;
+                    camera.Manufacturer = oNVIF_DEVICE_INFO.manufacturer is { Length: > 0 } ? Encoding.Default.GetString(oNVIF_DEVICE_INFO.manufacturer).TrimEnd('\0') : string.Empty;
+                    camera.DeviceTypeName = oNVIF_DEVICE_INFO.model is { Length: > 0 } ? Encoding.Default.GetString(oNVIF_DEVICE_INFO.model).TrimEnd('\0') : string.Empty;
+                }
+                else
+                {
+                    camera.Online = false;
+                }
+            }
+
             return response;
         }
 
@@ -52,6 +55,25 @@ namespace Lan.ServiceCore.Services
             var predicate = Expressionable.Create<CameraModel>();
 
             return predicate;
+        }
+
+
+        public Task<List<CameraModel>> GetListPreviewAsync()
+        {
+            return Queryable()
+                .LeftJoin<DefenceareaModel>((u, c) => u.BindingAreaId == c.Id)  // 修正：包含所有已连接的表
+                .Select((u, c) => new CameraModel
+                {
+                    Id = u.Id,
+                    BindingAreaId = u.BindingAreaId,
+                    Ip = u.Ip,
+                    Port = u.Port,
+                    CameraURL = u.CameraURL,
+                    Username = u.Username,
+                    Password = u.Password,
+                    ZoneName = c.Name,
+                })
+                .ToListAsync();
         }
 
         public CameraModel GetInfo(int Id)
@@ -110,7 +132,8 @@ namespace Lan.ServiceCore.Services
             {
                 CameraModel cameraModel = GetInfo(item);
                 BaseService.LoadUnBindCamera(cameraModel.Ip);
-                MemoryCacheHelper.Remove(cameraModel.Ip);
+                //MemoryCacheHelper.Remove(cameraModel.Ip);
+                _cache.Remove(cameraModel.Ip);
                 BaseService.LoadCalibration();
             }
             int i = Delete(id);
@@ -205,8 +228,8 @@ namespace Lan.ServiceCore.Services
 
         public void GetMinZoomPT(int Id, string Ip)
         {
-            common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(Ip);
-
+            //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(Ip);
+            common = _cache.Get<ONVIF_COMMON_INFO>(Ip);
             ONVIF_PTZ_STATUS aa = new ONVIF_PTZ_STATUS();
             int ret = onvifsdk.ONVIF_PTZ_GetStatus(2, ref common, ref aa);
 
@@ -218,7 +241,8 @@ namespace Lan.ServiceCore.Services
 
         public void GetMaxZoomPT(int Id, string Ip)
         {
-            common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(Ip);
+            //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(Ip);
+            common = _cache.Get<ONVIF_COMMON_INFO>(Ip);
             ONVIF_PTZ_STATUS aa = new ONVIF_PTZ_STATUS();
             int ret = onvifsdk.ONVIF_PTZ_GetStatus(2, ref common, ref aa);
 

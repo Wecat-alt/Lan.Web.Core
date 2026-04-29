@@ -19,6 +19,7 @@
 <script setup>
 import { listTrackInfo } from '@/api/alarm/trackinfo'
 import { listRadarByAreaId } from '@/api/device/radar'
+import { ints } from '@/utils/mapUtils'
 import L from 'leaflet'
 import 'leaflet.motion/dist/leaflet.motion.js'
 import 'leaflet/dist/leaflet.css'
@@ -43,42 +44,6 @@ const queryParams = ref({
 })
 
 // 方法定义
-const degreeToRadian = (degree) => {
-  return ((90 - degree) * Math.PI) / 180
-}
-
-const drawSector = (lat, lon, radius, startAngle, endAngle, color, fillLength) => {
-  const startRad = degreeToRadian(startAngle)
-  const endRad = degreeToRadian(endAngle)
-
-  const center = L.latLng(parseFloat(lat), parseFloat(lon))
-
-  const points = [center]
-  const steps = Math.max(16, Math.floor(Math.abs(endAngle - startAngle) / 5))
-
-  for (let i = 0; i <= steps; i++) {
-    const angle = startRad + (endRad - startRad) * (i / steps)
-    const point = L.latLng(
-      center.lat + (radius * Math.sin(angle)) / 111320,
-      center.lng + (radius * Math.cos(angle)) / (111320 * Math.cos((center.lat * Math.PI) / 180)),
-    )
-    points.push(point)
-  }
-
-  points.push(center)
-
-  const sector = L.polygon(points, {
-    color: color,
-    fillColor: color,
-    fillOpacity: fillLength,
-    weight: 2,
-  }).addTo(map.value)
-}
-
-const ints = (lat, lon, radius, startAngle, endAngle, color, fillLength) => {
-  drawSector(lat, lon, radius, startAngle, endAngle, color, fillLength)
-}
-
 const initMap = () => {
   console.log('回放地图URL：', mapUrl)
 
@@ -106,15 +71,18 @@ const initAlarm = async () => {
     radarRes.data.data.forEach((e) => {
       const begin = parseFloat(e.northDeviationAngle) - e.defenceAngle / 2
       const end = parseFloat(e.northDeviationAngle) + e.defenceAngle / 2
-      ints(
-        e.latitude,
-        e.longitude,
-        parseFloat(e.defenceRadius),
-        begin,
-        end,
-        e.status == 1 ? 'Yellow' : 'red',
-        e.status == 1 ? 0.1 : 0.1,
-      )
+      ints({
+        map: map.value,
+        lat: e.latitude,
+        lon: e.longitude,
+        radius: parseFloat(e.defenceRadius),
+        startAngle: begin,
+        endAngle: end,
+        color: e.status == 1 ? 'Yellow' : 'red',
+        fillLength: e.status == 1 ? 0.1 : 0.1,
+        weight: 2,
+        showMarker: false,
+      })
     })
 
     console.log('回放中心点：', latitude, longitude)

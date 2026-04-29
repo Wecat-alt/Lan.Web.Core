@@ -1,5 +1,4 @@
-﻿using Infrastructure;
-using Lan.Infrastructure.Cache;
+using Infrastructure;
 using Lan.Infrastructure.CameraOnvif;
 using Lan.Repository;
 using Lan.ServiceCore.IService;
@@ -7,6 +6,7 @@ using Lan.ServiceCore.Onvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services.Base;
 using Lan.ServiceCore.WebScoket;
+using MemoryCache.Core;
 using Model;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -17,9 +17,10 @@ namespace Lan.ServiceCore.Services
     public class CalibrationService : Repository<Calibration>, ICalibrationService
     {
         ONVIF_COMMON_INFO common = new ONVIF_COMMON_INFO();
-
-        public CalibrationService()
+        private readonly IMemoryCacheService? _cache;
+        public CalibrationService(IMemoryCacheService? cache = null)
         {
+            _cache = cache;
         }
 
 
@@ -28,7 +29,8 @@ namespace Lan.ServiceCore.Services
         {
             Queryable().Where(f => f.CameraIp == model.CameraIp && f.DefenceareaId == model.DefenceareaId).ToList().ForEach(item => { Delete(item.Id); });
 
-            common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(model.CameraIp);
+            //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(model.CameraIp);
+            common = _cache.Get<ONVIF_COMMON_INFO>(model.CameraIp);
 
             ONVIF_PTZ_STATUS panPost = new ONVIF_PTZ_STATUS();
             int ret = onvifsdk.ONVIF_PTZ_GetStatus(2, ref common, ref panPost);
@@ -53,8 +55,8 @@ namespace Lan.ServiceCore.Services
             //oNVIF_PTZ_ABSOLUTEMOVE.zoomPosition=0;   //变倍变数 [0, 1] 若只想水平垂直运动，zoomPosition可设置为-2.0; 
 
 
-            common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(ip);
-            //float onvif_speed = float.Parse(speed);
+            //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(ip);
+            common = _cache.Get<ONVIF_COMMON_INFO>(ip);
             float onvif_speed = float.Parse(speed, CultureInfo.InvariantCulture);
             switch (_CameraPTZ)
             {
@@ -117,7 +119,8 @@ namespace Lan.ServiceCore.Services
         public void PtzStop(string ip)
         {
             ONVIF_PTZ_CONTINUSMOVE ONVIF_PTZ_CONTINUSMOVE = new ONVIF_PTZ_CONTINUSMOVE();
-            common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(ip);
+            //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(ip);
+            common = _cache.Get<ONVIF_COMMON_INFO>(ip);
             onvifsdk.ONVIF_PTZ_ContinusStop(2, ref common);
         }
 

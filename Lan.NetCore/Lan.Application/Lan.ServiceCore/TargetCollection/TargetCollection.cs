@@ -87,7 +87,7 @@ namespace Lan.ServiceCore.TargetCollection
         /// <returns>是否成功添加了目标</returns>
         internal bool AddTarget(WRadar radar, List<Coordinate[]> ListRadarPolygon1, List<Coordinate[]> ListRadarPolygon2, List<Coordinate[]> ListRadarPolygon3)
         {
-            DateTime now = DateTime.Now;
+           
             bool isAdded = false;
             List<SendMS> radarTacks = new List<SendMS>();
             var AlarmId = -1;// alarmService.GetInfos(DefenceArea.ID);
@@ -102,6 +102,8 @@ namespace Lan.ServiceCore.TargetCollection
 
             foreach (var tar in radar.RadarTargets.Targets)
             {
+                DateTime now = DateTime.Now;
+
                 float x = tar.X;
 
                 if (radar.InvertX)  //判断是否需要对X坐标反向
