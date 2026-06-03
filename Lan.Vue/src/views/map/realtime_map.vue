@@ -777,11 +777,6 @@ function clearAll() {
     }
   })
   sectors.value = []
-
-  // if (currentClickListener) {
-  //   map.off('click', currentClickListener);
-  //   currentClickListener = null;
-  // }
 }
 
 // 类型选择处理

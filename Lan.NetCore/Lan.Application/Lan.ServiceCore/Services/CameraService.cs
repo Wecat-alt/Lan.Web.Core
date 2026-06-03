@@ -249,8 +249,8 @@ namespace Lan.ServiceCore.Services
 
             int i = UpdateSql($"UPDATE camera SET maxZoomPan = {aa.panPosition},maxZoomTilt = {aa.tiltPosition} WHERE ID = '{Id}'");
             WCamera _camera = CameraManager.GetInstance()[Id];
-            _camera.minZoomPan = aa.panPosition;
-            _camera.minZoomTilt = aa.tiltPosition;
+            _camera.maxZoomPan = aa.panPosition;
+            _camera.maxZoomTilt = aa.tiltPosition;
         }
     }
 }
