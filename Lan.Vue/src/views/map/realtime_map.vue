@@ -67,52 +67,9 @@
                 />
               </el-form-item>
             </el-form>
-
-            <div class="con-title" style="display: none">地图信息设置</div>
-            <div class="tool-box" style="display: none">
-              <el-table :data="tableData" height="390" style="width: 100%">
-                <el-table-column prop="id" width="100" label="报警时间" />
-                <el-table-column prop="areaName" width="100" label="报警防区" />
-                <el-table-column prop="dateTime" label="跟踪相机" />
-              </el-table>
-            </div>
           </div>
         </div>
       </el-drawer>
-
-      <!-- <div class="inquiry-div">
-
-        <button class="toggle-btn">
-          <el-icon><Search /></el-icon>
-        </button>
-        <div class="inquiry-box">
-          <div class="inquiry-input-line">
-            <el-input-tag type="text" class="inquiry-input" placeholder="请输入关键词" />
-            <el-icon class="close-ico"><Close /></el-icon>
-          </div>
-          <div class="inquiry-con">
-            <div class="inquiry-tab-btn">
-              <button class="inquiry-btn"><el-icon><HelpFilled /></el-icon>找设备</button>
-              <button class="inquiry-btn"><el-icon><StarFilled /></el-icon>找标绘</button>
-              <button class="inquiry-btn"><el-icon><HomeFilled /></el-icon>找站点</button>
-            </div>
-            <div class="regular-con">
-              <div class="inquiry-equ-list">
-                <ul>
-                  <li>
-                    <label class="order-label">监控站</label>
-                    默认监控点<el-icon class="el-icon-arrow-right"><ArrowRight /></el-icon>
-                  </li>
-                  <li>
-                    <label class="order-label">设备</label>
-                    <label class="order-label-red">离线</label>SP200VF-5<el-icon class="el-icon-arrow-right"><ArrowRight /></el-icon>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div> -->
     </div>
     <!--maponcon-end-->
 
@@ -128,6 +85,15 @@
       :win-options="previewWinOptions"
       :initial-rect="previewRect"
       @closed="handlePreviewClosed"
+    />
+
+    <!-- 报警视频弹窗（右下角） -->
+    <LocalPlayerWindow
+      v-model="alarmPopupVisible"
+      :title="alarmPopupTitle"
+      :win-options="alarmPopupWinOptions"
+      :initial-rect="alarmPopupRect"
+      @closed="closeAlarmPopup"
     />
 
     <!-- Element Plus 对话框选择 -->
@@ -159,13 +125,12 @@
 import { getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 import { listRadar, updateLatLng, updateRadar } from '@/api/device/radar'
-import { addDrawPolygon, delDrawPolygon, listDrawPolygon, sendMsgClose } from '@/api/map/map'
+import { addDrawPolygon, delDrawPolygon, listDrawPolygon } from '@/api/map/map'
 import { updateConfig } from '@/api/system/config'
 import LocalPlayerWindow from '@/components/LocalPlayerWindow.vue'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import L from 'leaflet'
-import 'leaflet.motion/dist/leaflet.motion.js'
 import 'leaflet/dist/leaflet.css'
 
 import { CircleCloseFilled } from '@element-plus/icons-vue'
@@ -175,9 +140,6 @@ import { initSignalR, setSignalRReceiveEnabled } from '@/utils/signalRUtils'
 import { TrackManager } from '@/utils/TrackManager'
 
 const trackManager = ref(null)
-const targetList = ref([])
-const activeTargetCount = ref(0)
-const trackedTargetId = ref(null)
 
 const visible = ref(false)
 
@@ -191,23 +153,7 @@ const mapCenter_lng = ref(0)
 const mapZoom = ref(16)
 
 let map = ref(null)
-let timer1 = null
-let timer2 = null
-let timer4 = null
 
-let timerOpen = null
-
-let seqGroupLatLon = []
-let seqGroups = []
-
-let his_seqGroups = []
-
-let alarmData = ref({
-  alarmRadarIp: null,
-  alarmTime: null,
-})
-
-let connection = ref(null)
 let unsubscribeSignalR = null
 // 长链接数据接口
 const longLinkApi = window.__APP_CONFIG__.VITE_SIGNALR_URL
@@ -215,18 +161,16 @@ const longLinkApi = window.__APP_CONFIG__.VITE_SIGNALR_URL
 const longLinkMsg = 'ReceiveTargetData'
 const longLinkSendMsg = 'ReceiveTargetData'
 
-//let  trackTarget=ref('');
 const y_Id = ref(0)
 
 const queryParams = reactive({
-  pageNum: 1,
-  pageSize: 10,
-  sort: 'id',
-  sortType: 'asc',
-  ip: undefined,
+  id: undefined,
+  angle: undefined,
+  radius: undefined,
+  northDeviationAngle: undefined,
+  radarLat: undefined,
+  radarLon: undefined,
 })
-
-const tableData = []
 
 const form = {
   drawId: 0,
@@ -237,18 +181,6 @@ const form = {
 }
 
 const drawPolygon = []
-
-//Radar扇形图和扇形图集合
-const radarDevices = []
-
-const radarDraw = {
-  radius: 500, //探测距离
-  angle: 60,
-  northDeviationAngle: 90, //旋转角度
-  lat: 28.202616,
-  lng: 112.894302,
-  step: 4,
-}
 
 const radarOptions = ref([])
 
@@ -268,8 +200,23 @@ const previewRect = Object.freeze({
 })
 const previewWinOptions = ref({})
 const activePreviewKey = ref('')
-let videoAutoCloseTimer = null
-let externalOpenTimer = null
+
+// 报警视频弹窗
+const alarmPopupVisible = ref(false)
+const alarmPopupWinOptions = ref({})
+const alarmPopupTitle = ref('报警视频')
+const alarmPopupRect = Object.freeze({
+  left: Math.max(0, window.innerWidth - 515),
+  top: Math.max(0, window.innerHeight - 285),
+  width: 500,
+  height: 220,
+})
+let alarmPopupTimer = null
+let latestAlarmTime = null
+let currentAlarmRadarIp = null
+let alarmCooldownTimer = null
+const alarmAutoPopupEnabled = ref(false)
+
 const defaultRadarIconUrl = '/status/radar_lan.png'
 const alertRadarIconUrl = '/status/radar_red.png'
 const radarAlertSwitcher = createRadarAlertSwitcher({
@@ -290,14 +237,6 @@ const closeVideoPopup = () => {
     }
   } catch (e) {
     console.log('closeVideoPopup error', e)
-  }
-  if (videoAutoCloseTimer) {
-    clearTimeout(videoAutoCloseTimer)
-    videoAutoCloseTimer = null
-  }
-  if (externalOpenTimer) {
-    clearTimeout(externalOpenTimer)
-    externalOpenTimer = null
   }
 }
 
@@ -334,26 +273,73 @@ function handlePreviewClosed() {
   activePreviewKey.value = ''
 }
 
+// 报警视频弹窗 - 开启15秒循环定时器
+function startAlarmPopupTimer() {
+  if (alarmPopupTimer) clearTimeout(alarmPopupTimer)
+  alarmPopupTimer = setTimeout(() => {
+    closeAlarmPopup()
+  }, 15000)
+}
+
+// 报警视频弹窗 - 打开
+function openAlarmPopup(radarIp) {
+  // 自动弹窗已关闭 → 不弹窗
+  if (!alarmAutoPopupEnabled.value) return
+
+  // 冷却期 → 不弹窗
+  if (alarmCooldownTimer) return
+
+  // 已有弹窗显示中 → 不管几个雷达报警，只弹一次，不切换
+  if (alarmPopupVisible.value) return
+
+  const radar = radarOptions.value.find((item) => item.ip === radarIp)
+  if (!radar) return
+
+  const { cameraIp, username, password, cameraURL } = radar
+  if (!cameraIp || !username || !password || !cameraURL) return
+
+  const uniqueKey = [cameraIp, cameraURL, username].filter(Boolean).join('|')
+  alarmPopupWinOptions.value = {
+    winId: `alarmPopup-${btoa(unescape(encodeURIComponent(uniqueKey))).replace(/=+$/g, '')}-${Date.now()}`,
+    rtspUrl: cameraURL,
+    username,
+    password,
+  }
+  alarmPopupTitle.value = '报警视频 - ' + radarIp
+  currentAlarmRadarIp = radarIp
+  alarmPopupVisible.value = true
+
+  startAlarmPopupTimer()
+}
+
+// 报警视频弹窗 - 关闭（2秒冷却后若报警持续则自动重开）
+function closeAlarmPopup() {
+  if (alarmPopupTimer) {
+    clearTimeout(alarmPopupTimer)
+    alarmPopupTimer = null
+  }
+
+  const savedRadarIp = currentAlarmRadarIp
+  alarmPopupVisible.value = false
+  currentAlarmRadarIp = null
+
+  if (alarmCooldownTimer) clearTimeout(alarmCooldownTimer)
+
+  alarmCooldownTimer = setTimeout(() => {
+    alarmCooldownTimer = null
+    if (savedRadarIp && Date.now() - latestAlarmTime < 15000) {
+      openAlarmPopup(savedRadarIp)
+    }
+  }, 2000)
+}
+
 handall()
-getList()
 init(longLinkApi, longLinkMsg, longLinkSendMsg)
 
 onMounted(() => {
   initDrawPolygon()
   initMap()
-  openVideo()
-  clear_Target()
-  clear_HisTarget()
-  clear_SeqGroupLatLon()
 })
-
-function getList() {
-  // listAlarmRef(queryParams).then(res => {
-  //   if (res.data.code == 200) {
-  //     tableData = res.data.data
-  //   }
-  // })
-}
 function handleselect() {
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   queryParams.angle = tt.defenceAngle
@@ -374,11 +360,6 @@ const saveAngle = () => {
 function saveRadius() {
   clearAll()
 
-  radarDevices.forEach((item) => {
-    map.value.removeLayer(item)
-  })
-  radarDevices.value = []
-
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.defenceRadius = queryParams.radius
 
@@ -388,11 +369,6 @@ function saveRadius() {
 }
 function saveDirection() {
   clearAll()
-
-  radarDevices.forEach((item) => {
-    map.value.removeLayer(item)
-  })
-  radarDevices.value = []
 
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.northDeviationAngle = JSON.stringify(queryParams.northDeviationAngle)
@@ -404,11 +380,6 @@ function saveDirection() {
 function handleChangeLan() {
   clearAll()
 
-  radarDevices.forEach((item) => {
-    map.value.removeLayer(item)
-  })
-  radarDevices.value = []
-
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.latitude = JSON.stringify(queryParams.radarLat)
 
@@ -418,11 +389,6 @@ function handleChangeLan() {
 }
 function handleChangeLon() {
   clearAll()
-  //number | undefined
-  radarDevices.forEach((item) => {
-    map.value.removeLayer(item)
-  })
-  radarDevices.value = []
 
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
   tt.longitude = JSON.stringify(queryParams.radarLon)
@@ -455,13 +421,6 @@ function handall() {
     queryParams.radarLon = tt.longitude
 
     for (let item of radarOptions.value) {
-      ;((radarDraw.radius = item.defenceRadius), //探测距离
-        (radarDraw.angle = item.defenceAngle),
-        (radarDraw.northDeviationAngle = parseFloat(item.northDeviationAngle)), //旋转角度
-        (radarDraw.lat = item.latitude),
-        (radarDraw.lng = item.longitude),
-        (radarDraw.step = item.status == 1 ? 4 : 0))
-
       let begin = parseFloat(item.northDeviationAngle) - item.defenceAngle / 2
       let end = parseFloat(item.northDeviationAngle) + item.defenceAngle / 2
       const cameraIp = item.cameraIp
@@ -528,18 +487,13 @@ function initMap() {
   console.log('地图URL：', mapUrl)
 
   map.value = L.map('map-container', {
-    center: [mapCenter_lat.value, mapCenter_lng.value], // 中心位置
-    //center: [28.210508, 112.894302], // 中心位置
-    zoom: mapZoom.value, // 缩放等级
-    attributionControl: false, // 版权控件
-    zoomControl: true, //缩放控件
+    center: [mapCenter_lat.value, mapCenter_lng.value],
+    zoom: mapZoom.value,
+    attributionControl: false,
+    zoomControl: true,
   })
 
-  L.tileLayer(
-    //"http://localhost:1122?style=6&x={x}&y={y}&z={z}"
-    //'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', //在线天地图
-    mapUrl,
-  ).addTo(map.value) // 加载底图
+  L.tileLayer(mapUrl).addTo(map.value)
 
   proxy.getConfigKey('mapCenter').then((response) => {
     var ss = response.data.data.split(',')
@@ -549,6 +503,10 @@ function initMap() {
 
   proxy.getConfigKey('mapZoom').then((response) => {
     map.value.setZoom(parseInt(response.data.data))
+  })
+
+  proxy.getConfigKey('isOpen').then((response) => {
+    alarmAutoPopupEnabled.value = String(response.data.data) === '1'
   })
 
   // 初始化轨迹管理器
@@ -579,10 +537,6 @@ function initMap() {
 
   map.value.on('pm:drawstart', (e) => {
     console.log('pm:drawstart' + e)
-
-    // if (e.shape == "Line") {
-    //   console.log("Line" + e);
-    // }
 
     selectedType.value = 0
     showTypeDialog.value = true // 显示选择对话框
@@ -628,20 +582,9 @@ function initMap() {
         return delDrawPolygon(encodeURIComponent(jsonString))
       })
       .then(() => {
-        // getList()
         proxy.$modal.msgSuccess(proxy.$t('message.deleteSuccess'))
       })
   })
-
-  map.value.on('pm:globalremovalmodetoggled', () => {
-    //点击开始/结束 删除时出发
-    //console.log("4"+e);
-  })
-
-  // map.on("layerremove", (e) => {
-  //    //删除任何层时触发
-  // });
-  //initAlarm();
 
   map.value.pm.setPathOptions({
     color: 'blue',
@@ -649,6 +592,7 @@ function initMap() {
     fillOpacity: 0.1,
   })
 }
+
 function initDrawPolygon() {
   listDrawPolygon().then((res) => {
     if (res.data.code == 200) {
@@ -695,63 +639,10 @@ function initDrawPolygon() {
     }
   })
 }
-function openVideo() {
-  timerOpen = setInterval(() => {
-    if (alarmData.value.alarmTime != undefined) {
-      var time_now = Date.now()
-      var ss = time_now - alarmData.value.alarmTime
-      if (ss > 3000) {
-        alarmData.value.radarIp = null
-        alarmData.value.alarmTime = null
-
-        sendMsgClose().then((res) => {
-          if (res.data.code == 200) {
-            console.log('三秒没有报警信息，则关闭窗口')
-          }
-        })
-      }
-    }
-  }, 1000)
-}
-function clear_Target() {
-  timer1 = setInterval(() => {
-    seqGroups.forEach((element, index) => {
-      var time_now = Date.now()
-      var ss = time_now - element.timeClear
-      if (ss > 15000) {
-        map.value.removeLayer(element.seqGroup)
-        seqGroups.splice(index, 1)
-      }
-    })
-  }, 1000)
-}
-function clear_SeqGroupLatLon() {
-  timer4 = setInterval(() => {
-    seqGroupLatLon.forEach((element, index) => {
-      var time_now = Date.now()
-      var ss = time_now - element.timeClear
-      if (ss > 5000) {
-        seqGroupLatLon.splice(index, 1)
-      }
-    })
-  }, 1000)
-}
-function clear_HisTarget() {
-  timer2 = setInterval(() => {
-    his_seqGroups.forEach((element, index) => {
-      var time_now = Date.now()
-      var ss = time_now - element.timeClear
-      if (ss > 2000) {
-        map.value.removeLayer(element.seqGroup)
-        his_seqGroups.splice(index, 1)
-      }
-    })
-  }, 1000)
-}
 async function init(api, acceptMsg, sendMsg) {
   console.log('signalRapi 请求地址：', api)
 
-  const { connection: sharedConnection, unsubscribe } = await initSignalR({
+  const { unsubscribe } = await initSignalR({
     api,
     acceptMsg,
     sendMsg,
@@ -764,7 +655,6 @@ async function init(api, acceptMsg, sendMsg) {
     },
   })
 
-  connection.value = sharedConnection
   unsubscribeSignalR = unsubscribe
   setSignalRReceiveEnabled(true)
 }
@@ -834,18 +724,13 @@ onBeforeUnmount(() => {
     unsubscribeSignalR = null
   }
 
+  closeAlarmPopup()
+  if (alarmCooldownTimer) {
+    clearTimeout(alarmCooldownTimer)
+    alarmCooldownTimer = null
+  }
   radarAlertSwitcher.resetAll()
 
-  clearInterval(timer1)
-  clearInterval(timer2)
-  clearInterval(timer4)
-  clearInterval(timerOpen)
-
-  sendMsgClose().then((res) => {
-    if (res.data.code == 200) {
-      console.log('三秒没有报警信息，则关闭窗口')
-    }
-  })
   map.value.remove()
   map.value = null
 })
@@ -865,30 +750,19 @@ const initTrackManager = () => {
   // 设置事件回调
   trackManager.value.onTargetAdded = (targetId, targetData) => {
     console.log(`目标 ${targetId} 已添加`, targetData)
-    updateTargetList()
   }
 
   trackManager.value.onTargetUpdated = (targetId, targetData) => {
     console.log(`目标 ${targetId} 已更新`, targetData)
-    updateTargetList()
   }
 
   trackManager.value.onTargetRemoved = (removedTargetIds) => {
     console.log(`目标已移除: ${removedTargetIds.join(', ')}`)
-    updateTargetList()
   }
 
   trackManager.value.onTargetTracked = (targetId, targetData) => {
     console.log(`正在跟踪目标 ${targetId}`, targetData)
-    trackedTargetId.value = targetId
   }
-}
-// 更新目标列表
-const updateTargetList = () => {
-  if (!trackManager.value) return
-
-  activeTargetCount.value = trackManager.value.getActiveTargetCount()
-  targetList.value = trackManager.value.getAllTargets().sort((a, b) => b.timestamp - a.timestamp) // 按时间倒序
 }
 // 处理雷达数据（SignalR 回调）
 const handleRadarData = (res) => {
@@ -900,8 +774,10 @@ const handleRadarData = (res) => {
       const processedData = trackManager.value.processRadarData(serverData)
 
       if (processedData) {
-        // 这里可以添加其他业务逻辑，比如报警、相机控制等
-        //handleAdditionalLogic(processedData)
+        latestAlarmTime = Date.now()
+        if (processedData.radarIp) {
+          openAlarmPopup(processedData.radarIp)
+        }
       }
     }
   } catch (error) {
@@ -917,8 +793,6 @@ const trackTarget = (targetId) => {
 }
 
 const setCenter = () => {
-  //connection.invoke('SendToClientId', 'ReceiveMessage', 'Hello from Browser')
-
   const centerPoint = map.value.getCenter()
   const lat = centerPoint.lat.toFixed(6)
   const lng = centerPoint.lng.toFixed(6)
@@ -938,53 +812,6 @@ const setCenter = () => {
 </script>
 
 <style :scoped lang="scss">
-.tool-box {
-  float: left;
-  width: 100%;
-  height: 30%;
-  box-sizing: border-box;
-  text-align: left;
-  background-color: #f0f8ff;
-}
-
-.slider-demo-block {
-  display: flex;
-  align-items: center;
-}
-
-.slider-demo-block .el-slider {
-  margin-top: 0;
-  margin-left: 12px;
-}
-
-.floating-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 450px;
-  height: 100vh;
-  background: #fff;
-  box-shadow: -5px 0 25px #00000026;
-  z-index: 999;
-  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  transform: translate(100%);
-  overflow-y: auto;
-}
-
-.floating-panel.active {
-  transform: translate(0);
-}
-
-@media (max-width: 768px) {
-  .content {
-    grid-template-columns: 1fr;
-  }
-
-  .floating-panel {
-    width: 300px;
-  }
-}
-
 .leaflet-popup-content-wrapper {
   background: transparent !important;
   box-shadow: none !important;
