@@ -117,7 +117,8 @@ export default defineComponent({
       const wizardStep = localStorage.getItem('wizard')
       // 打开 livePreview 为单独窗口
       if (view === 'livePreview') {
-        window.open('/livePreview', '_blank')
+        const lang = localStorage.getItem('language') || 'zh'
+        window.open(`/livePreview?lang=${lang}`, '_blank')
         return
       }
 

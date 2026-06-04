@@ -3,24 +3,24 @@
     <div class="toolbar">
       <el-button-group>
         <el-button :type="layout === 4 ? 'primary' : 'default'" @click="setLayout(4)"
-          >4宫格</el-button
+          >{{ $t('livePreview.layout4') }}</el-button
         >
         <el-button :type="layout === 6 ? 'primary' : 'default'" @click="setLayout(6)"
-          >6宫格</el-button
+          >{{ $t('livePreview.layout6') }}</el-button
         >
         <el-button :type="layout === 9 ? 'primary' : 'default'" @click="setLayout(9)"
-          >9宫格</el-button
+          >{{ $t('livePreview.layout9') }}</el-button
         >
       </el-button-group>
-      <el-button :loading="loadingCameras" @click="fetchCameraList">刷新相机</el-button>
-      <el-switch v-model="autoSwitch" active-text="自动切换" />
+      <el-button :loading="loadingCameras" @click="fetchCameraList">{{ $t('livePreview.refreshCamera') }}</el-button>
+      <el-switch v-model="autoSwitch" :active-text="$t('livePreview.autoSwitch')" />
     </div>
 
     <div class="content-wrap">
       <aside class="camera-list-panel">
-        <div class="camera-list-title">相机列表</div>
+        <div class="camera-list-title">{{ $t('livePreview.cameraList') }}</div>
         <div class="camera-list-body">
-          <div v-if="!cameras.length" class="camera-list-empty">暂无相机</div>
+          <div v-if="!cameras.length" class="camera-list-empty">{{ $t('livePreview.noCamera') }}</div>
           <div v-for="(camera, idx) in cameras" :key="camera.id || idx" class="camera-list-item">
             <span class="camera-index"> {{ idx + 1 }}.</span>
             <span class="camera-ip" :title="camera.ip || '-'">{{ camera.ip || '-' }}</span>
@@ -53,7 +53,7 @@
                   class="cell-fullscreen-btn"
                   :disabled="fullscreenSwitching"
                   type="button"
-                  :title="fullscreenSlotIndex === idx ? '退出全屏' : '全屏显示'"
+                  :title="fullscreenSlotIndex === idx ? $t('livePreview.exitFullscreen') : $t('livePreview.fullscreen')"
                   @click="toggleFullscreen(idx)"
                 >
                   {{ fullscreenSlotIndex === idx ? '🗗' : '⛶' }}
@@ -107,8 +107,10 @@ import {
   ref,
   watch,
 } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const { proxy } = getCurrentInstance()
+const { t } = useI18n()
 
 defineOptions({
   name: 'LivePreviewPage',
@@ -193,7 +195,7 @@ function isCameraSlot(slot = {}) {
 
 function getSlotHeaderTitle(slot = {}) {
   if (slot.type === 'embedded') {
-    return `${slot.label || ''} | GIS地图`.trim()
+    return `${slot.label || ''} | ${t('livePreview.gisMap')}`.trim()
   }
 
   const zoneText = slot.zoneName || '-'
@@ -203,9 +205,9 @@ function getSlotHeaderTitle(slot = {}) {
 
 function getSlotStatus(slot = {}, idx) {
   if (slot.type === 'embedded') {
-    return '地图显示中'
+    return t('livePreview.mapDisplaying')
   }
-  return playingMap[idx] ? '自动预览中' : '未配置RTSP'
+  return playingMap[idx] ? t('livePreview.autoPreviewing') : t('livePreview.rtspNotConfigured')
 }
 
 function initEmbeddedLeafletMap() {
@@ -367,7 +369,7 @@ const trackTarget = (targetId) => {
 function normalizeCamera(item = {}, idx = 0) {
   return {
     id: item.id ?? item.cameraId ?? item.pid ?? idx + 1,
-    zoneName: `防区: ${item.zoneName}`,
+    zoneName: `${t('livePreview.zone')}: ${item.zoneName}`,
     ip: item.ip,
     username: item.username,
     password: item.password,
@@ -403,11 +405,11 @@ async function fetchCameraList() {
     })
     await refreshAutoPreview()
     if (!cameras.value.length) {
-      ElMessage.warning('未获取到可预览相机')
+      ElMessage.warning(t('livePreview.noPreviewCamera'))
     }
   } catch (error) {
-    console.error('获取预览相机失败：', error)
-    ElMessage.error('获取预览相机失败')
+    console.error(t('livePreview.fetchCameraFailedMsg'), error)
+    ElMessage.error(t('livePreview.fetchCameraFailed'))
   } finally {
     loadingCameras.value = false
   }
@@ -483,7 +485,7 @@ async function openPreview(idx, options = {}) {
 
   if (!slot.rtsp) {
     if (showError) {
-      ElMessage.error('当前相机未配置 RTSP 地址')
+      ElMessage.error(t('livePreview.noRtspWarning'))
     }
     if (markPlaying) {
       playingMap[idx] = false
@@ -646,7 +648,7 @@ async function toggleFullscreen(idx) {
 
   const slot = slots.value[idx] || {}
   if (isCameraSlot(slot) && !slot.rtsp) {
-    ElMessage.warning('当前窗口未配置 RTSP 地址')
+    ElMessage.warning(t('livePreview.noRtspSlotWarning'))
     return
   }
 

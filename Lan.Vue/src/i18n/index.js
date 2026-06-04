@@ -8,7 +8,14 @@ const messages = {
   en: enLocale,
 };
 
-const savedLocale = localStorage.getItem("language") || "zh";
+const urlParams = new URLSearchParams(window.location.search)
+const urlLang = urlParams.get('lang')
+const savedLocale = urlLang || localStorage.getItem("language") || "zh"
+
+// 如果 URL 参数带了语言，同步写入 localStorage
+if (urlLang) {
+  localStorage.setItem("language", urlLang)
+};
 
 export const i18n = createI18n({
   legacy: false,

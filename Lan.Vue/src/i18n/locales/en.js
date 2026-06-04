@@ -264,4 +264,27 @@ export default {
     configKey: 'Parameter key cannot be empty',
     configValue: 'Parameter value cannot be empty',
   },
+
+  // Live Preview
+  livePreview: {
+    layout4: '4-Grid',
+    layout6: '6-Grid',
+    layout9: '9-Grid',
+    refreshCamera: 'Refresh Camera',
+    autoSwitch: 'Auto Switch',
+    cameraList: 'Camera List',
+    noCamera: 'No Camera',
+    gisMap: 'GIS Map',
+    mapDisplaying: 'Map Displaying',
+    autoPreviewing: 'Auto Previewing',
+    rtspNotConfigured: 'RTSP Not Configured',
+    fullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit Fullscreen',
+    zone: 'Zone',
+    noPreviewCamera: 'No Preview Camera Available',
+    fetchCameraFailed: 'Failed to Fetch Camera',
+    fetchCameraFailedMsg: 'Failed to fetch camera: ',
+    noRtspWarning: 'Current camera has no RTSP address configured',
+    noRtspSlotWarning: 'Current window has no RTSP address configured',
+  },
 }

@@ -268,4 +268,27 @@ export default {
     configKey: '参数键名不能为空',
     configValue: '参数键值不能为空',
   },
+
+  // 实时预览
+  livePreview: {
+    layout4: '4宫格',
+    layout6: '6宫格',
+    layout9: '9宫格',
+    refreshCamera: '刷新相机',
+    autoSwitch: '自动切换',
+    cameraList: '相机列表',
+    noCamera: '暂无相机',
+    gisMap: 'GIS地图',
+    mapDisplaying: '地图显示中',
+    autoPreviewing: '自动预览中',
+    rtspNotConfigured: '未配置RTSP',
+    fullscreen: '全屏显示',
+    exitFullscreen: '退出全屏',
+    zone: '防区',
+    noPreviewCamera: '未获取到可预览相机',
+    fetchCameraFailed: '获取预览相机失败',
+    fetchCameraFailedMsg: '获取预览相机失败：',
+    noRtspWarning: '当前相机未配置 RTSP 地址',
+    noRtspSlotWarning: '当前窗口未配置 RTSP 地址',
+  },
 }
