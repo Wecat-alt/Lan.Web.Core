@@ -138,6 +138,9 @@ namespace Lan.Application
 
             builder.Services.AddSingleton<RTSPtoWebRTCProxyService>();
 
+            // 前端 config.js 自动更新
+            builder.Services.AddTransient<ConfigJsUpdater>();
+
             //业务APP
             if (OperatingSystem.IsLinux())
             {

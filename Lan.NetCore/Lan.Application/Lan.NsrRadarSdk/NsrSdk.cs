@@ -560,22 +560,32 @@ namespace CAT.NsrRadarSdk
                         radar.Port = _useTcp ? 50000 : 8100;
                     }
 
-                    radar.DevAddress = context.srcAddr;
-                    if (context.paramBytes != null)
+                    if (context == null || context.paramBytes == null || context.paramBytes.Length <= 9)
                     {
-                        radar.DevAddressNew = (RVS_DeviceAddressNEW)context.paramBytes[9];
-
-                        //RVS_PARAM_BROADCAST broadcast = (RVS_PARAM_BROADCAST)context.paramObject;
-
-                        //radar.MacAddress = broadcast.MacAddress;
-                        //radar.FirmwareVersion = broadcast.FirmwareVersion;
-
-                        //Task.Factory.StartNew((() =>
-                        //{
-                        //    NsrSdk.Instance.OnRadarBroadcast(radar, ref broadcast);
-                        //})).ContinueWith(t => { },
-                        //    TaskContinuationOptions.OnlyOnFaulted);
+                        continue;
                     }
+
+                    if (context.command != RVS_COMMAND.RVS_BROADCASTCOMMAND)
+                    {
+                        continue;
+                    }
+
+                    if (!(context.paramObject is RVS_PARAM_BROADCAST broadcast))
+                    {
+                        continue;
+                    }
+
+                    radar.DevAddress = context.srcAddr;
+                    radar.DevAddressNew = (RVS_DeviceAddressNEW)context.paramBytes[9];
+
+                    radar.MacAddress = broadcast.MacAddress;
+                    radar.FirmwareVersion = broadcast.FirmwareVersion;
+
+                    Task.Factory.StartNew((() =>
+                    {
+                        NsrSdk.Instance.OnRadarBroadcast(radar, ref broadcast);
+                    })).ContinueWith(t => { },
+                        TaskContinuationOptions.OnlyOnFaulted);
                 }
                 catch (ObjectDisposedException)
                 {

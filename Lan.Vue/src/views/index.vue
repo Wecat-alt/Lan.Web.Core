@@ -122,6 +122,12 @@ export default defineComponent({
         return
       }
 
+      // if (view === 'autoMap') {
+      //   const lang = localStorage.getItem('language') || 'zh'
+      //   window.open(`/autoMap?lang=${lang}`, '_blank')
+      //   return
+      // }
+
       if (view === 'radar' && wizardStep) {
         currentView.value = views['radar'] || realtime_map
         updateSignalRReceiveState('radar')

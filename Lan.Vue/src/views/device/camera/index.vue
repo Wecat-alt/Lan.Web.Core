@@ -671,6 +671,7 @@ export default {
 
         cameraId: 0,
         sourceToken: '',
+        zoneName: '',
       }
       this.resetForm('formRef')
     },
