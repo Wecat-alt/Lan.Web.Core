@@ -122,7 +122,7 @@ namespace Lan.Application
             builder.Services.AddSingleton(typeof(DbContext<>));
 
             builder.Services.AddSingleton<GlobalVariable>();
-            GlobalVariable globalVariable = new GlobalVariable();
+
             builder.Services.AddSingleton<Lan.ServiceCore.Onvif.IOnvifManage, Lan.ServiceCore.Onvif.OnvifManage>();
 
             //注入SignalR实时通讯，默认用json传输
@@ -131,10 +131,14 @@ namespace Lan.Application
             builder.Services.AddHostedService<TrackTarget>();
 
             builder.Services.AddHostedService<RadarDataChannelService>();
-            builder.Services.AddSingleton<RadarDataChannelService>(); // 
+            builder.Services.AddSingleton<RadarDataChannelService>(); //
 
             builder.Services.AddHostedService<AlarmBackgroundService>();
             builder.Services.AddSingleton<AlarmBackgroundService>(); // 作为单例供其他服务调用
+
+            // 新版雷达 SDK 连接管理（独立于旧版 NsrRadarSdk）
+            builder.Services.AddHostedService<RadarClientManager>();
+            builder.Services.AddSingleton<RadarClientManager>(); // 作为单例供其他服务调用
 
             builder.Services.AddSingleton<RTSPtoWebRTCProxyService>();
 
@@ -169,14 +173,13 @@ namespace Lan.Application
             InternalApp.Configuration = builder.Configuration;
             InternalApp.WebHostEnvironment = app.Environment;
 
+            // 触发 GlobalVariable 初始化（依赖 App.GetService，必须在容器构建后调用）
+            app.Services.GetRequiredService<GlobalVariable>();
+
             // Read CORS origins from configuration array `CorsUrls`.
-            var corsOrigins = builder.Configuration.GetSection("CorsUrls").Get<string[]>() ?? new string[0];
+            var corsOrigins = builder.Configuration.GetSection("CorsUrls").Get<string[]>() ?? [];
 
-            app.UseCors(opt =>
-            {
-                opt.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
-            });
-
+            // ---- 应用初始化（在管道构建前执行） ----
             app.CameraInit();
             app.RadarInit();
             app.DefenceAreaInit();
@@ -184,45 +187,48 @@ namespace Lan.Application
             var onvifManage = app.Services.GetService<Lan.ServiceCore.Onvif.IOnvifManage>();
             onvifManage?.Init();
 
-            int ret1 = RBTrackSdk.RBTRACK_DeInit();
-            int ret2 = RBTrackSdk.RBTRACK_Init(256);
+            RBTrackSdk.RBTRACK_DeInit();
+            RBTrackSdk.RBTRACK_Init(256);
 
             RBTRACKManage.Init();
 
             DefenceAreaManager.GetInstance().EnbaleRadarEvent();
 
-            // Configure the HTTP request pipeline.
-            //if (app.Environment.IsDevelopment())
-            //{
-            app.UseSwagger();
-            app.UseSwaggerUI();
-            //}
+            // ==================== HTTP 中间件管道 ====================
+            // 顺序：异常处理 → HTTPS → Swagger → Routing → CORS → 认证 → 授权 → 终结点
+
+            // 1. 全局异常处理（必须在管道最前面）
+            app.UseExceptionHandler(exceptionHandlerApp =>
+            {
+                exceptionHandlerApp.Run(async context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync("{\"code\":500,\"msg\":\"Internal Server Error\"}");
+                });
+            });
 
             app.UseHttpsRedirection();
 
+            // Swagger（开发/演示环境始终启用）
+            app.UseSwagger();
+            app.UseSwaggerUI();
+
+            // 2. Routing 必须在 CORS 和 Auth 之前
+            app.UseRouting();
+
+            // 3. CORS
+            app.UseCors(opt =>
+            {
+                opt.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+            });
+
+            // 4. 认证 & 授权
+            app.UseAuthentication();
             app.UseAuthorization();
 
-            //signalr
-            app.UseCors("AllowSpecificOrigin");
-            app.UseRouting();
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapHub<MessageHub>("/hubs/stock"); // 映射你的 Hub
-            });
-
-            app.Use(async (context, next) =>
-            {
-                try
-                {
-                    await next();
-                }
-                catch (Exception ex)
-                {
-                    context.Response.StatusCode = 500;
-                    await context.Response.WriteAsync("An error occurred");
-                }
-            });
-
+            // 5. 终结点
+            app.MapHub<MessageHub>("/hubs/stock");
             app.MapControllers();
 
             app.Run();

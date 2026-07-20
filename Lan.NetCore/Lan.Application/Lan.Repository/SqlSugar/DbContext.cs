@@ -11,29 +11,26 @@ namespace Lan.Repository.SqlSugar
 {
     public class DbContext<T> where T : class, new()
     {
-        public SqlSugarClient Db;
-        public SimpleClient<T> CurrentDb { get { return new SimpleClient<T>(Db); } }
-        //public 
-        public DbContext()
+        // 全局唯一 SqlSugarClient（延迟初始化，线程安全）
+        // SqlSugarClient 官方推荐单例模式，共享实例可复用内部元数据缓存和连接池
+        private static readonly Lazy<SqlSugarClient> _sharedClient = new(() =>
         {
-            var showDbLog = AppSettings.Get<string>("ConnectionStrings:conn");
-
-            Db = new SqlSugarClient(new ConnectionConfig()
+            var connStr = AppSettings.Get<string>("ConnectionStrings:conn");
+            return new SqlSugarClient(new ConnectionConfig()
             {
                 DbType = DbType.MySql,
-                ConnectionString = showDbLog,
-                //ConnectionString = $"",
+                ConnectionString = connStr,
                 IsAutoCloseConnection = true,
                 InitKeyType = InitKeyType.Attribute
             });
+        });
 
-            //Db.Aop.OnLogExecuting = (sql, parameters) =>
-            //{
-            //    Console.WriteLine(sql); // 输出SQL
-            //                            // 如果需要，还可以输出参数
-            //                            // Console.WriteLine(string.Join(",", parameters?.Select(it => it.ParameterName + ":" + it.Value)));
-            //};
+        /// <summary>全局共享的 SqlSugar 客户端实例</summary>
+        public SqlSugarClient Db => _sharedClient.Value;
 
-        }
+        public SimpleClient<T> CurrentDb => new(Db);
+
+        // 保留无参构造以兼容直接 new 的场景（如 AlarmAndRadarBackgroundService 中直接 new 的 Service）
+        public DbContext() { }
     }
 }

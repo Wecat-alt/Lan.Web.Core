@@ -1,5 +1,88 @@
 <template>
   <div>
+    <!-- ══════════ 向导模式 ══════════ -->
+    <div v-if="_isWizard" class="wizard-layout">
+      <div class="wizard-steps">
+        <el-steps :active="0" align-center finish-status="success">
+          <el-step :title="$t('nav.radar')" />
+          <el-step :title="$t('nav.camera')" />
+          <el-step :title="$t('nav.zone')" />
+          <el-step :title="$t('nav.calibration')" />
+        </el-steps>
+      </div>
+
+      <div class="wizard-body">
+        <div class="wizard-header">
+          <h3>第 1 步：{{ $t('common.add') }}{{ $t('nav.radar') }}</h3>
+          <p class="wizard-desc">请添加至少一个雷达设备，填写 IP、经纬度和探测参数</p>
+        </div>
+
+        <el-form ref="wizardFormRef" :model="form" :rules="rules" label-width="140px" class="wizard-form">
+          <el-row :gutter="20">
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.ip')" prop="ip">
+                <el-input v-model="form.ip" placeholder="192.168.1.100" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.port')" prop="port">
+                <el-input v-model.number="form.port" :disabled="true" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.latitude')" prop="latitude">
+                <el-input v-model="form.latitude" placeholder="39.9042" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.longitude')" prop="longitude">
+                <el-input v-model="form.longitude" placeholder="116.4074" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.northDeviationAngle')" prop="northDeviationAngle">
+                <el-input v-model="form.northDeviationAngle" placeholder="0" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.defenceRadius')" prop="defenceRadius">
+                <el-input v-model="form.defenceRadius" placeholder="500" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.defenceAngle')" prop="defenceAngle">
+                <el-input v-model="form.defenceAngle" placeholder="90" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.radarType')" prop="radarType">
+                <el-input v-model="form.radarType" placeholder="NSR-100" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.status')">
+                <el-radio-group v-model="form.status">
+                  <el-radio v-for="dict in statusOptions" :key="dict.dictValue" :label="parseInt(dict.dictValue)">
+                    {{ dict.dictValue === '1' ? $t('common.enabled') : $t('common.disabled') }}
+                  </el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+
+        <div class="wizard-actions">
+          <el-button @click="wizardExit">{{ $t('common.cancel') }}</el-button>
+          <el-button @click="wizardSkip">跳过</el-button>
+          <el-button type="primary" @click="wizardSubmit" :loading="wizardSubmitting">
+            提交并继续
+          </el-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 普通模式 ══════════ -->
+    <template v-else>
     <!-- <el-form :model="queryParams" label-position="right" inline ref="queryRef" v-show="showSearch" @submit.prevent>
         <el-form-item label="雷达IP" prop="ip">
           <el-input v-model="queryParams.ip" placeholder="请输入雷达IP" clearable style="width: 240px"
@@ -182,6 +265,7 @@
         <el-button type="primary" @click="submitForm">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
+    </template>
   </div>
 </template>
 
@@ -267,6 +351,9 @@ export default {
           },
         ],
       },
+      // 向导模式标记
+      _isWizard: false,
+      wizardSubmitting: false,
     }
   },
   created() {
@@ -351,12 +438,17 @@ export default {
     },
     handleAdd() {
       this.reset()
-      this.open = true
-      //this.title = '添加雷达'
-      this.title = this.$t('common.add')
-      this.fillMapCenterToForm()
       // 如果处于向导模式，标记当前步骤并在添加成功后跳转到相机管理
       this._isWizard = localStorage.getItem('wizard') === 'radar'
+      if (this._isWizard) {
+        // 向导模式：表单内嵌显示，不弹 dialog
+        this.title = this.$t('common.add') + ' - ' + this.$t('nav.radar')
+        this.fillMapCenterToForm()
+      } else {
+        this.open = true
+        this.title = this.$t('common.add')
+        this.fillMapCenterToForm()
+      }
     },
     handleUpdate(row) {
       this.reset()
@@ -368,7 +460,8 @@ export default {
       })
     },
     submitForm: function () {
-      this.$refs['formRef'].validate((valid) => {
+      const formRefName = this._isWizard ? 'wizardFormRef' : 'formRef'
+      this.$refs[formRefName].validate((valid) => {
         if (valid) {
           if (this.form.id != undefined) {
             updateRadar(this.form).then((response) => {
@@ -413,6 +506,21 @@ export default {
           this.getList()
           this.$modal.msgSuccess(this.$t('message.deleteSuccess'))
         })
+    },
+    // ══════════ 向导方法 ══════════
+    wizardSubmit() {
+      this.wizardSubmitting = true
+      this.submitForm()
+      // submitForm 异步，成功后会在回调里关 loading
+      setTimeout(() => { this.wizardSubmitting = false }, 3000)
+    },
+    wizardSkip() {
+      try { localStorage.setItem('wizard', 'camera') } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'camera' })) } catch (e) {}
+    },
+    wizardExit() {
+      try { localStorage.removeItem('wizard') } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' })) } catch (e) {}
     },
   },
 }
@@ -459,5 +567,60 @@ export default {
   100% {
     opacity: 1;
   }
+}
+
+/* ══════════ 向导布局 ══════════ */
+.wizard-layout {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 24px 32px;
+}
+
+.wizard-steps {
+  max-width: 800px;
+  margin: 0 auto 32px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.wizard-body {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.wizard-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.wizard-header h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #303133;
+}
+
+.wizard-desc {
+  margin: 0;
+  font-size: 14px;
+  color: #909399;
+}
+
+.wizard-form {
+  margin-bottom: 24px;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
 }
 </style>

@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Lan.ServiceCore.Services
 {
-    [AppService(ServiceType = typeof(IDrawPolygonService), ServiceLifetime = LifeTime.Scoped)]
+    [AppService(ServiceType = typeof(IDrawPolygonService), ServiceLifetime = LifeTime.Singleton)]
     public class DrawPolygonService : Repository<DrawPolygon>, IDrawPolygonService
     {
         public List<DrawPolygon> GetList()

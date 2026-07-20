@@ -1,452 +1,559 @@
 <template>
   <div>
-    <el-form
-      :model="queryParams"
-      label-position="right"
-      inline
-      ref="queryRef"
-      v-show="showSearch"
-      @submit.prevent
-      style="text-align: left"
-    >
-      <el-form-item :label="$t('camera.ip')" prop="ip">
-        <el-input
-          v-model="queryParams.ip"
-          clearable
-          style="width: 240px"
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item>
-        <el-button icon="search" type="primary" @click="handleQuery">{{
-          $t('common.search')
-        }}</el-button>
-      </el-form-item>
-    </el-form>
+    <!-- ══════════ 向导模式 ══════════ -->
+    <div v-if="_isWizard" class="wizard-layout">
+      <div class="wizard-steps">
+        <el-steps :active="1" align-center finish-status="success">
+          <el-step :title="$t('nav.radar')" />
+          <el-step :title="$t('nav.camera')" />
+          <el-step :title="$t('nav.zone')" />
+          <el-step :title="$t('nav.calibration')" />
+        </el-steps>
+      </div>
 
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button type="primary" @click="handleAdd" v-hasPermi="['system:post:add']">{{
-          $t('common.add')
-        }}</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="success" :disabled="single" @click="handleUpdate">
-          {{ $t('common.edit') }}
-        </el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="danger" :disabled="multiple" @click="handleDelete">
-          {{ $t('common.delete') }}
-        </el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="success" @click="handleSecrch">
-          {{ $t('common.probeUnicast') }}
-        </el-button>
-      </el-col>
-    </el-row>
+      <div class="wizard-body">
+        <div class="wizard-header">
+          <h3>第 2 步：{{ $t('common.add') }}{{ $t('nav.camera') }}</h3>
+          <p class="wizard-desc">请添加至少一个摄像头，填写 IP、账号密码和 RTSP 地址</p>
+        </div>
 
-    <el-table
-      v-loading="loading"
-      :data="dataList"
-      border
-      stripe
-      header-cell-class-name="el-table-header-cell"
-      highlight-current-row
-      @selection-change="handleSelectionChange"
-    >
-      <el-table-column type="selection" :selectable="selectable" width="55" />
-      <el-table-column prop="id" :label="$t('camera.id')" align="center" width="120" />
-      <el-table-column
-        prop="name"
-        :label="$t('camera.name')"
-        align="center"
-        :show-overflow-tooltip="true"
-        width="150"
-      />
-      <!-- <el-table-column prop="name" label="绑定防区" align="center"  /> -->
-      <el-table-column
-        prop="ip"
-        :label="$t('camera.ip')"
-        width="130"
-        align="center"
-        :show-overflow-tooltip="true"
-      >
-        <template #default="scope">
-          <el-button
-            class="camera-ip-link"
-            link
-            type="primary"
-            @click.stop="openLocalPlayerPreview(scope.row)"
-          >
-            {{ scope.row.ip }}
+        <el-form
+          ref="wizardFormRef"
+          :model="form"
+          :rules="rules"
+          label-width="140px"
+          class="wizard-form"
+        >
+          <el-row :gutter="20">
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.name')" prop="name">
+                <el-input v-model="form.name" placeholder="摄像头1" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.ip')" prop="ip">
+                <el-input v-model="form.ip" placeholder="192.168.1.200" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.port')" prop="port">
+                <el-input v-model.number="form.port" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.username')" prop="username">
+                <el-input v-model="form.username" placeholder="admin" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.password')" prop="password">
+                <el-input v-model="form.password" placeholder="******" show-password />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.cameraURL')" prop="cameraURL">
+                <el-input v-model="form.cameraURL" placeholder="rtsp://..." />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.cameraHeight')" prop="cameraHeight">
+                <el-input v-model="form.cameraHeight" placeholder="2" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.manufacturer')">
+                <el-select v-model="form.manufacturer" clearable style="width: 100%">
+                  <el-option
+                    v-for="dict in cameramfrOptions"
+                    :key="dict.dictValue"
+                    :label="dict.dictLabel"
+                    :value="dict.dictValue"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('camera.isTrack')">
+                <el-radio-group v-model="form.isTrack">
+                  <el-radio
+                    v-for="dict in isTrackOptions"
+                    :key="dict.dictValue"
+                    :label="parseInt(dict.dictValue)"
+                  >
+                    {{
+                      dict.dictValue === '1'
+                        ? $t('camera.track_status1')
+                        : $t('camera.track_status0')
+                    }}
+                  </el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+
+        <div class="wizard-actions">
+          <el-button @click="wizardExit">{{ $t('common.cancel') }}</el-button>
+          <el-button @click="wizardSkip">跳过</el-button>
+          <el-button type="primary" @click="wizardSubmit" :loading="wizardSubmitting">
+            提交并继续
           </el-button>
-        </template>
-      </el-table-column>
-      <el-table-column
-        prop="username"
-        :label="$t('camera.username')"
-        align="center"
-        :show-overflow-tooltip="true"
-        width="120"
-      />
-      <el-table-column
-        prop="password"
-        :label="$t('camera.password')"
-        align="center"
-        :show-overflow-tooltip="true"
-        width="120"
-      />
-      <el-table-column :label="$t('common.online_offline')" width="140" align="center">
-        <template #default="scope">
-          <div class="status-cell">
-            <span class="pulse-dot" :class="scope.row.online ? 'online' : 'offline'"></span>
-            <span :class="scope.row.online ? 'online-text' : 'offline-text'">
-              {{ scope.row.online ? $t('common.online') : $t('common.offline') }}
-            </span>
-          </div>
-        </template>
-      </el-table-column>
+        </div>
+      </div>
+    </div>
 
-      <el-table-column
-        prop="manufacturer"
-        :label="$t('camera.manufacturer')"
-        align="center"
-        :show-overflow-tooltip="true"
-        width="180"
-      />
-      <el-table-column
-        prop="deviceTypeName"
-        :label="$t('camera.deviceTypeName')"
-        align="center"
-        :show-overflow-tooltip="true"
-        width="200"
-      />
+    <!-- ══════════ 普通模式 ══════════ -->
+    <template v-else>
+      <el-form
+        :model="queryParams"
+        label-position="right"
+        inline
+        ref="queryRef"
+        v-show="showSearch"
+        @submit.prevent
+        style="text-align: left"
+      >
+        <el-form-item :label="$t('camera.ip')" prop="ip">
+          <el-input
+            v-model="queryParams.ip"
+            clearable
+            style="width: 240px"
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button icon="search" type="primary" @click="handleQuery">{{
+            $t('common.search')
+          }}</el-button>
+        </el-form-item>
+      </el-form>
 
-      <el-table-column
-        prop="cameraHeight"
-        :label="$t('camera.cameraHeight')"
-        align="center"
-        :show-overflow-tooltip="true"
-        width="120"
-      />
-      <el-table-column
-        prop="cameraURL"
-        :label="$t('camera.cameraURL')"
-        align="center"
-        :show-overflow-tooltip="true"
-        width="240"
-      />
-      <el-table-column :label="$t('camera.isTrack')" align="center" prop="isTrack" width="120">
-        <template #default="scope">
-          <el-tag :type="scope.row.isTrack == 1 ? 'success' : 'danger'">
-            {{ scope.row.isTrack == 1 ? $t('camera.track_status1') : $t('camera.track_status0') }}
-          </el-tag>
-        </template>
-      </el-table-column>
+      <el-row :gutter="10" class="mb8">
+        <el-col :span="1.5">
+          <el-button type="primary" @click="handleAdd" v-hasPermi="['system:post:add']">{{
+            $t('common.add')
+          }}</el-button>
+        </el-col>
+        <el-col :span="1.5">
+          <el-button type="success" :disabled="single" @click="handleUpdate">
+            {{ $t('common.edit') }}
+          </el-button>
+        </el-col>
+        <el-col :span="1.5">
+          <el-button type="danger" :disabled="multiple" @click="handleDelete">
+            {{ $t('common.delete') }}
+          </el-button>
+        </el-col>
+        <el-col :span="1.5">
+          <el-button type="success" @click="handleSecrch">
+            {{ $t('common.probeUnicast') }}
+          </el-button>
+        </el-col>
+      </el-row>
 
-      <el-table-column :label="$t('radar.actions')" align="center">
-        <template #default="scope">
-          <el-button
-            type="success"
-            size="small"
-            icon="edit"
-            :title="$t('common.edit')"
-            v-hasPermi="['defencearea:edit']"
-            @click="handleUpdate(scope.row)"
-          ></el-button>
-          <el-button
-            type="danger"
-            size="small"
-            icon="delete"
-            :title="$t('common.delete')"
-            v-hasPermi="['defencearea:delete']"
-            @click="handleDelete(scope.row)"
-          ></el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <LocalPlayerWindow
-      v-model="previewVisible"
-      :title="$t('gis.cameraPreview')"
-      :win-options="previewWinOptions"
-      :initial-rect="previewRect"
-      @closed="handlePreviewClosed"
-    />
-
-    <!-- 添加或修改对话框 -->
-    <el-dialog
-      :title="title"
-      :lock-scroll="false"
-      v-model="open"
-      width="1200px"
-      :close-on-click-modal="false"
-    >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-row :gutter="20">
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.id')" prop="id">
-              <el-input-number
-                v-model.number="form.id"
-                controls-position="right"
-                :disabled="true"
-              />
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.name')" prop="name">
-              <el-input v-model="form.name" />
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.sys_dict_data_size')" prop="sys_dict_data_size">
-              <el-select
-                v-model="form.sys_dict_data_size"
-                clearable
-                style="width: 240px"
-                @change="handleselect"
-              >
-                <el-option
-                  v-for="dict in cameramfrOptions"
-                  :key="dict.dictValue"
-                  :label="dict.dictLabel"
-                  :value="dict.dictValue"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="6"> </el-col>
-
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.ip')" prop="ip">
-              <el-input v-model="form.ip" />
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.port')" prop="port">
-              <el-input v-model.number="form.port" />
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.username')" prop="username">
-              <el-input v-model="form.username" />
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.password')" prop="password">
-              <el-input v-model="form.password" />
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="6">
-            <el-form-item
-              :label="$t('camera.cameraHeight')"
-              prop="cameraHeight"
-              class="custom-red-form"
+      <el-table
+        v-loading="loading"
+        :data="dataList"
+        border
+        stripe
+        header-cell-class-name="el-table-header-cell"
+        highlight-current-row
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" :selectable="selectable" width="55" />
+        <el-table-column prop="id" :label="$t('camera.id')" align="center" width="120" />
+        <el-table-column
+          prop="name"
+          :label="$t('camera.name')"
+          align="center"
+          :show-overflow-tooltip="true"
+          width="150"
+        />
+        <!-- <el-table-column prop="name" label="绑定防区" align="center"  /> -->
+        <el-table-column
+          prop="ip"
+          :label="$t('camera.ip')"
+          width="130"
+          align="center"
+          :show-overflow-tooltip="true"
+        >
+          <template #default="scope">
+            <el-button
+              class="camera-ip-link"
+              link
+              type="primary"
+              @click.stop="openLocalPlayerPreview(scope.row)"
             >
-              <el-input v-model="form.cameraHeight" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.minViewAngle')" prop="minViewAngle">
-              <el-input v-model="form.minViewAngle" />
-            </el-form-item>
-          </el-col>
+              {{ scope.row.ip }}
+            </el-button>
+          </template>
+        </el-table-column>
+        <el-table-column
+          prop="username"
+          :label="$t('camera.username')"
+          align="center"
+          :show-overflow-tooltip="true"
+          width="120"
+        />
+        <el-table-column
+          prop="password"
+          :label="$t('camera.password')"
+          align="center"
+          :show-overflow-tooltip="true"
+          width="120"
+        />
+        <el-table-column :label="$t('common.online_offline')" width="140" align="center">
+          <template #default="scope">
+            <div class="status-cell">
+              <span class="pulse-dot" :class="scope.row.online ? 'online' : 'offline'"></span>
+              <span :class="scope.row.online ? 'online-text' : 'offline-text'">
+                {{ scope.row.online ? $t('common.online') : $t('common.offline') }}
+              </span>
+            </div>
+          </template>
+        </el-table-column>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.viewAngle2X')" prop="viewAngle2X">
-              <el-input v-model="form.viewAngle2X" />
-            </el-form-item>
-          </el-col>
+        <el-table-column
+          prop="manufacturer"
+          :label="$t('camera.manufacturer')"
+          align="center"
+          :show-overflow-tooltip="true"
+          width="180"
+        />
+        <el-table-column
+          prop="deviceTypeName"
+          :label="$t('camera.deviceTypeName')"
+          align="center"
+          :show-overflow-tooltip="true"
+          width="200"
+        />
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.maxViewAngle')" prop="maxViewAngle">
-              <el-input v-model="form.maxViewAngle" />
-            </el-form-item>
-          </el-col>
+        <el-table-column
+          prop="cameraHeight"
+          :label="$t('camera.cameraHeight')"
+          align="center"
+          :show-overflow-tooltip="true"
+          width="120"
+        />
+        <el-table-column
+          prop="cameraURL"
+          :label="$t('camera.cameraURL')"
+          align="center"
+          :show-overflow-tooltip="true"
+          width="240"
+        />
+        <el-table-column :label="$t('camera.isTrack')" align="center" prop="isTrack" width="120">
+          <template #default="scope">
+            <el-tag :type="scope.row.isTrack == 1 ? 'success' : 'danger'">
+              {{ scope.row.isTrack == 1 ? $t('camera.track_status1') : $t('camera.track_status0') }}
+            </el-tag>
+          </template>
+        </el-table-column>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.maxZoom')" prop="maxZoom">
-              <el-input v-model.number="form.maxZoom" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.maxZoomRatio')" prop="maxZoomRatio">
-              <el-input v-model="form.maxZoomRatio" />
-            </el-form-item>
-          </el-col>
+        <el-table-column :label="$t('radar.actions')" align="center">
+          <template #default="scope">
+            <el-button
+              type="success"
+              size="small"
+              icon="edit"
+              :title="$t('common.edit')"
+              v-hasPermi="['defencearea:edit']"
+              @click="handleUpdate(scope.row)"
+            ></el-button>
+            <el-button
+              type="danger"
+              size="small"
+              icon="delete"
+              :title="$t('common.delete')"
+              v-hasPermi="['defencearea:delete']"
+              @click="handleDelete(scope.row)"
+            ></el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.counterclockwise')">
-              <el-radio-group v-model="form.counterclockwise">
-                <el-radio
-                  v-for="dict in clockwise_status"
-                  :key="dict.dictValue"
-                  :label="parseInt(dict.dictValue)"
+      <LocalPlayerWindow
+        v-model="previewVisible"
+        :title="$t('gis.cameraPreview')"
+        :win-options="previewWinOptions"
+        :initial-rect="previewRect"
+        @closed="handlePreviewClosed"
+      />
+
+      <!-- 添加或修改对话框 -->
+      <el-dialog
+        :title="title"
+        :lock-scroll="false"
+        v-model="open"
+        width="1200px"
+        :close-on-click-modal="false"
+      >
+        <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+          <el-row :gutter="20">
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.id')" prop="id">
+                <el-input-number
+                  v-model.number="form.id"
+                  controls-position="right"
+                  :disabled="true"
+                />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.name')" prop="name">
+                <el-input v-model="form.name" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.sys_dict_data_size')" prop="sys_dict_data_size">
+                <el-select
+                  v-model="form.sys_dict_data_size"
+                  clearable
+                  style="width: 240px"
+                  @change="handleselect"
                 >
-                  {{
-                    dict.dictValue === '1'
-                      ? $t('camera.counterclockwise1')
-                      : $t('camera.counterclockwise0')
-                  }}
-                </el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.isTrack')">
-              <el-radio-group v-model="form.isTrack">
-                <el-radio
-                  v-for="dict in isTrackOptions"
-                  :key="dict.dictValue"
-                  :label="parseInt(dict.dictValue)"
-                >
-                  {{
-                    dict.dictValue === '1' ? $t('camera.track_status1') : $t('camera.track_status0')
-                  }}
-                </el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panLeft')" prop="panLeft">
-              <el-input v-model="form.panLeft" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panMiddle')" prop="panMiddle">
-              <el-input v-model="form.panMiddle" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panLeftAngle')" prop="panLeftAngle">
-              <el-input v-model="form.panLeftAngle" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panMiddleAngle')" prop="panMiddleAngle">
-              <el-input v-model="form.panMiddleAngle" />
-            </el-form-item>
-          </el-col>
+                  <el-option
+                    v-for="dict in cameramfrOptions"
+                    :key="dict.dictValue"
+                    :label="dict.dictLabel"
+                    :value="dict.dictValue"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panMiddle2')" prop="panMiddle2">
-              <el-input v-model="form.panMiddle2" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panRight')" prop="panRight">
-              <el-input v-model="form.panRight" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panMiddle2Angle')" prop="panMiddle2Angle">
-              <el-input v-model="form.panMiddle2Angle" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.panRightAngle')" prop="panRightAngle">
-              <el-input v-model="form.panRightAngle" />
-            </el-form-item>
-          </el-col>
+            <el-col :lg="6"> </el-col>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.tiltTop')" prop="tiltTop">
-              <el-input v-model="form.tiltTop" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.tiltBottom')" prop="tiltBottom">
-              <el-input v-model="form.tiltBottom" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.tiltTopAngle')" prop="tiltTopAngle">
-              <el-input v-model="form.tiltTopAngle" />
-            </el-form-item>
-          </el-col>
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.tiltBottomAngle')" prop="tiltBottomAngle">
-              <el-input v-model="form.tiltBottomAngle" />
-            </el-form-item>
-          </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.ip')" prop="ip">
+                <el-input v-model="form.ip" />
+              </el-form-item>
+            </el-col>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.minZoomPan')" prop="minZoomPan">
-              <el-input v-model="form.minZoomPan" />
-            </el-form-item>
-          </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.port')" prop="port">
+                <el-input v-model.number="form.port" />
+              </el-form-item>
+            </el-col>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.minZoomTilt')" prop="minZoomTilt">
-              <el-input v-model="form.minZoomTilt" />
-            </el-form-item>
-          </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.username')" prop="username">
+                <el-input v-model="form.username" />
+              </el-form-item>
+            </el-col>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.maxZoomPan')" prop="maxZoomPan">
-              <el-input v-model="form.maxZoomPan" />
-            </el-form-item>
-          </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.password')" prop="password">
+                <el-input v-model="form.password" />
+              </el-form-item>
+            </el-col>
 
-          <el-col :lg="6">
-            <el-form-item :label="$t('camera.maxZoomTilt')" prop="maxZoomTilt">
-              <el-input v-model="form.maxZoomTilt" />
-            </el-form-item>
-          </el-col>
+            <el-col :lg="6">
+              <el-form-item
+                :label="$t('camera.cameraHeight')"
+                prop="cameraHeight"
+                class="custom-red-form"
+              >
+                <el-input v-model="form.cameraHeight" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.minViewAngle')" prop="minViewAngle">
+                <el-input v-model="form.minViewAngle" />
+              </el-form-item>
+            </el-col>
 
-          <el-col :lg="24">
-            <el-form-item :label="$t('camera.cameraURL')" prop="cameraURL">
-              <el-input v-model="form.cameraURL" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-      <template #footer v-if="opertype != 3">
-        <el-button text @click="cancel">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="submitForm">{{ $t('common.save') }}</el-button>
-      </template>
-    </el-dialog>
-    <!-- 搜索弹窗（独立） -->
-    <el-dialog
-      :title="searchTitle"
-      v-model="searchOpen"
-      width="400px"
-      :close-on-click-modal="false"
-    >
-      <el-form :model="searchForm" label-width="100px">
-        <el-row :gutter="24">
-          <el-col :lg="20">
-            <el-form-item :label="$t('camera.ip')">
-              <el-input v-model="searchForm.ip" clearable />
-            </el-form-item>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.viewAngle2X')" prop="viewAngle2X">
+                <el-input v-model="form.viewAngle2X" />
+              </el-form-item>
+            </el-col>
 
-            <el-form-item :label="$t('camera.port')">
-              <el-input v-model.number="searchForm.port" />
-            </el-form-item>
-            <el-form-item :label="$t('camera.username')">
-              <el-input v-model="searchForm.username" clearable />
-            </el-form-item>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.maxViewAngle')" prop="maxViewAngle">
+                <el-input v-model="form.maxViewAngle" />
+              </el-form-item>
+            </el-col>
 
-            <el-form-item :label="$t('camera.password')">
-              <el-input v-model="searchForm.password" clearable />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-      <template #footer>
-        <el-button text @click="searchOpen = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="applySearch">{{ $t('common.confirm') }}</el-button>
-      </template>
-    </el-dialog>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.maxZoom')" prop="maxZoom">
+                <el-input v-model.number="form.maxZoom" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.maxZoomRatio')" prop="maxZoomRatio">
+                <el-input v-model="form.maxZoomRatio" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.counterclockwise')">
+                <el-radio-group v-model="form.counterclockwise">
+                  <el-radio
+                    v-for="dict in clockwise_status"
+                    :key="dict.dictValue"
+                    :label="parseInt(dict.dictValue)"
+                  >
+                    {{
+                      dict.dictValue === '1'
+                        ? $t('camera.counterclockwise1')
+                        : $t('camera.counterclockwise0')
+                    }}
+                  </el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.isTrack')">
+                <el-radio-group v-model="form.isTrack">
+                  <el-radio
+                    v-for="dict in isTrackOptions"
+                    :key="dict.dictValue"
+                    :label="parseInt(dict.dictValue)"
+                  >
+                    {{
+                      dict.dictValue === '1'
+                        ? $t('camera.track_status1')
+                        : $t('camera.track_status0')
+                    }}
+                  </el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panLeft')" prop="panLeft">
+                <el-input v-model="form.panLeft" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panMiddle')" prop="panMiddle">
+                <el-input v-model="form.panMiddle" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panLeftAngle')" prop="panLeftAngle">
+                <el-input v-model="form.panLeftAngle" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panMiddleAngle')" prop="panMiddleAngle">
+                <el-input v-model="form.panMiddleAngle" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panMiddle2')" prop="panMiddle2">
+                <el-input v-model="form.panMiddle2" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panRight')" prop="panRight">
+                <el-input v-model="form.panRight" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panMiddle2Angle')" prop="panMiddle2Angle">
+                <el-input v-model="form.panMiddle2Angle" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.panRightAngle')" prop="panRightAngle">
+                <el-input v-model="form.panRightAngle" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.tiltTop')" prop="tiltTop">
+                <el-input v-model="form.tiltTop" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.tiltBottom')" prop="tiltBottom">
+                <el-input v-model="form.tiltBottom" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.tiltTopAngle')" prop="tiltTopAngle">
+                <el-input v-model="form.tiltTopAngle" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.tiltBottomAngle')" prop="tiltBottomAngle">
+                <el-input v-model="form.tiltBottomAngle" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.minZoomPan')" prop="minZoomPan">
+                <el-input v-model="form.minZoomPan" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.minZoomTilt')" prop="minZoomTilt">
+                <el-input v-model="form.minZoomTilt" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.maxZoomPan')" prop="maxZoomPan">
+                <el-input v-model="form.maxZoomPan" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="6">
+              <el-form-item :label="$t('camera.maxZoomTilt')" prop="maxZoomTilt">
+                <el-input v-model="form.maxZoomTilt" />
+              </el-form-item>
+            </el-col>
+
+            <el-col :lg="24">
+              <el-form-item :label="$t('camera.cameraURL')" prop="cameraURL">
+                <el-input v-model="form.cameraURL" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+        <template #footer v-if="opertype != 3">
+          <el-button text @click="cancel">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="submitForm">{{ $t('common.save') }}</el-button>
+        </template>
+      </el-dialog>
+      <!-- 搜索弹窗（独立） -->
+      <el-dialog
+        :title="searchTitle"
+        v-model="searchOpen"
+        width="400px"
+        :close-on-click-modal="false"
+      >
+        <el-form :model="searchForm" label-width="100px">
+          <el-row :gutter="24">
+            <el-col :lg="20">
+              <el-form-item :label="$t('camera.ip')">
+                <el-input v-model="searchForm.ip" clearable />
+              </el-form-item>
+
+              <el-form-item :label="$t('camera.port')">
+                <el-input v-model.number="searchForm.port" />
+              </el-form-item>
+              <el-form-item :label="$t('camera.username')">
+                <el-input v-model="searchForm.username" clearable />
+              </el-form-item>
+
+              <el-form-item :label="$t('camera.password')">
+                <el-input v-model="searchForm.password" clearable />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+        <template #footer>
+          <el-button text @click="searchOpen = false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="applySearch">{{ $t('common.confirm') }}</el-button>
+        </template>
+      </el-dialog>
+    </template>
   </div>
 </template>
 
@@ -574,6 +681,9 @@ export default {
       cameramfrOptions: ref([]),
       clockwise_status: ref([]),
       isTrackOptions: ref([]),
+      // 向导模式标记
+      _isWizard: false,
+      wizardSubmitting: false,
     }
   },
   created() {
@@ -743,21 +853,27 @@ export default {
     },
     handleAdd() {
       this.reset()
-      this.open = true
-      this.title = this.$t('common.add')
       this._isWizard = localStorage.getItem('wizard') === 'camera'
+      if (this._isWizard) {
+        this.title = this.$t('common.add') + ' - ' + this.$t('nav.camera')
+      } else {
+        this.open = true
+        this.title = this.$t('common.add')
+      }
     },
     handleUpdate(row) {
       this.reset()
       const Ids = row.id || this.ids
       getCamera(Ids).then((response) => {
         this.form = response.data.data
+        this.form.zoneName = this.form.zoneName || ''
         this.open = true
         this.title = this.$t('common.edit')
       })
     },
     submitForm: function () {
-      this.$refs['formRef'].validate((valid) => {
+      const formRefName = this._isWizard ? 'wizardFormRef' : 'formRef'
+      this.$refs[formRefName].validate((valid) => {
         if (valid) {
           if (this.form.id != undefined) {
             this.form.trackMode = 1
@@ -861,6 +977,30 @@ export default {
       this.searchOpen = false
       this.getList()
     },
+    // ══════════ 向导方法 ══════════
+    wizardSubmit() {
+      this.wizardSubmitting = true
+      this.submitForm()
+      setTimeout(() => {
+        this.wizardSubmitting = false
+      }, 3000)
+    },
+    wizardSkip() {
+      try {
+        localStorage.setItem('wizard', 'defencearea')
+      } catch (e) {}
+      try {
+        window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'defencearea' }))
+      } catch (e) {}
+    },
+    wizardExit() {
+      try {
+        localStorage.removeItem('wizard')
+      } catch (e) {}
+      try {
+        window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' }))
+      } catch (e) {}
+    },
   },
 }
 </script>
@@ -918,5 +1058,53 @@ export default {
   100% {
     opacity: 1;
   }
+}
+
+/* ══════════ 向导布局 ══════════ */
+.wizard-layout {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 24px 32px;
+}
+.wizard-steps {
+  max-width: 800px;
+  margin: 0 auto 32px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+.wizard-body {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+.wizard-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+.wizard-header h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #303133;
+}
+.wizard-desc {
+  margin: 0;
+  font-size: 14px;
+  color: #909399;
+}
+.wizard-form {
+  margin-bottom: 24px;
+}
+.wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
 }
 </style>

@@ -39,6 +39,10 @@
       <span>{{ $t('nav.gis') }}</span>
     </el-menu-item>
 
+    <el-menu-item v-if="canAccessMenu('radar3d')" index="radar3d">
+      <span>{{ $t('nav.radar3d') }}</span>
+    </el-menu-item>
+
     <el-menu-item v-if="canAccessMenu('alarm')" index="alarm">
       <span>{{ $t('nav.alarm') }}</span>
     </el-menu-item>
@@ -84,6 +88,7 @@ export default defineComponent({
       'config',
       'autoMap',
       'livePreview',
+      'radar3d',
     ]
 
     const defaultActive = computed(() => {

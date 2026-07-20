@@ -1,4 +1,5 @@
 ﻿using Lan.Infrastructure.CameraOnvif;
+using Lan.ServiceCore.IService;
 using Lan.ServiceCore.Services;
 using MemoryCache.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,11 +21,16 @@ namespace Lan.ServiceCore.Onvif
         private ONVIF_MANAGEMENT_CAPABILITIES capabilities = new ONVIF_MANAGEMENT_CAPABILITIES();
 
         private readonly IMemoryCacheService _cache;
-        public OnvifManage(IMemoryCacheService cache) { _cache = cache; }
+        private readonly ICameraService _cameraService;
+        public OnvifManage(IMemoryCacheService cache, ICameraService cameraService)
+        {
+            _cache = cache;
+            _cameraService = cameraService;
+        }
 
         public void Init()
         {
-            List<CameraModel> listCamera = new CameraService().GetAllList();
+            List<CameraModel> listCamera = _cameraService.GetAllList();
 
             if (listCamera is { Count: > 0 })
             {

@@ -1,4 +1,6 @@
-﻿using Lan.ServiceCore.Services;
+﻿using Infrastructure;
+using Lan.ServiceCore.IService;
+using Lan.ServiceCore.Services;
 using Lan.ServiceCore.TargetCollection;
 using Model;
 using System.Data;
@@ -9,7 +11,7 @@ namespace Lan.Database
     {
         public static WCamera[] GetCameras()
         {
-            CameraService cameraService = new();
+            var cameraService = App.GetService<ICameraService>();
             var ds = cameraService.GetAllList();
 
             if (ds.Count == 0)

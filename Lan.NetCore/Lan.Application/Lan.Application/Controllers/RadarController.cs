@@ -8,108 +8,55 @@ namespace Lan.Application.Controllers
 {
     [Route("api/radar")]
     [ApiController]
-    public class RadarController : BaseController
+    public class RadarController(IRadarService rs) : BaseController
     {
-        private readonly IRadarService _RadarService;
-
-        public RadarController(IRadarService RadarService)
-        {
-            _RadarService = RadarService;
-        }
 
         [HttpGet("list")]
-        public IActionResult QueryRadar([FromQuery] RadarQueryDto parm)
-        {
-            var response = _RadarService.GetList(parm);
-            return Message(response);
-        }
+        public IActionResult QueryRadar([FromQuery] RadarQueryDto parm) => Message(rs.GetList(parm));
 
         [HttpGet("all")]
-        public IActionResult QueryRadarAll()
-        {
-            var response = _RadarService.GetListALL();
-            return Message(response);
-        }
+        public IActionResult QueryRadarAll() => Message(rs.GetListALL());
 
         [HttpGet("{Id}")]
-        public IActionResult GetRadar(int Id)
-        {
-            var response = _RadarService.GetInfo(Id);
-
-            var info = response.Adapt<RadarDto>();
-            return Message(info);
-        }
+        public IActionResult GetRadar(int Id) => Message(rs.GetInfo(Id).Adapt<RadarDto>());
 
         [HttpPost]
         public IActionResult AddRadar([FromBody] RadarDto parm)
         {
             var modal = parm.Adapt<RadarModel>().ToCreate(HttpContext);
-
-            var bl = _RadarService.GetInfoByIp(parm.Ip);
-            if (bl)
-            {
-                return ToResponse(ResultCode.DATA_REPEAT, "The IP address already exists. Save failed!");
-            }
-
-            var response = _RadarService.AddRadar(modal);
-
-            return Message(response);
+            return rs.GetInfoByIp(parm.Ip)
+                ? ToResponse(ResultCode.DATA_REPEAT, "The IP address already exists. Save failed!")
+                : Message(rs.AddRadar(modal));
         }
 
         [HttpPut]
         public IActionResult UpdateRadar([FromBody] RadarDto parm)
-        {
-            var modal = parm.Adapt<RadarModel>().ToUpdate(HttpContext);
-            
-            var response = _RadarService.UpdateRadar(modal);
+            => ToResponse(rs.UpdateRadar(parm.Adapt<RadarModel>().ToUpdate(HttpContext)));
 
-            return ToResponse(response);
-        }
         [HttpGet("setLatLng/{Ip}/{Lat}/{Lng}")]
         public IActionResult SetCalibrationTrack(string Ip, string Lat, string Lng)
         {
-            _RadarService.UpdateRadarLatLng( Ip, Lat, Lng);
+            rs.UpdateRadarLatLng(Ip, Lat, Lng);
             return Message("OK");
         }
 
         [HttpDelete("delete/{ids}")]
         public IActionResult DeleteRadar([FromRoute] string ids)
-        {
-            int[] idArr = Lan.Tools.Tools.SplitAndConvert<int>(ids);
+            => ToResponse(rs.DeleteRadar(Lan.Tools.Tools.SplitAndConvert<int>(ids)));
 
-            return ToResponse(_RadarService.DeleteRadar(idArr));
-        }
         [HttpGet("listby/{AreaId}")]
-        public IActionResult GetRadarByAreaId(int AreaId)
-        {
-            var response = _RadarService.GetListByAreaId(AreaId);
-            return Message(response);
-        }
+        public IActionResult GetRadarByAreaId(int AreaId) => Message(rs.GetListByAreaId(AreaId));
+
         [HttpPost("rjadd")]
         public IActionResult GetRepetitionJudgmentAdd([FromBody] RadarQueryDto1 parm)
-        {
-            var modal = parm.Adapt<DefenceareaModel>().ToUpdate(HttpContext);
+            => parm.RadarIds is { Length: > 0 }
+                ? ToResponse(ResultCode.RepetitionJudgment, rs.RepetitionJudgment(parm.RadarIds).Trim())
+                : Message("OK");
 
-            if (parm.RadarIds?.Length > 0)
-            {
-                string str = _RadarService.RepetitionJudgment(parm.RadarIds);
-                return ToResponse(ResultCode.RepetitionJudgment, str.Trim());
-            }
-
-            return Message("OK");
-        }
         [HttpPost("rjedit")]
         public IActionResult GetRepetitionJudgmentEdit([FromBody] RadarQueryDto2 parm)
-        {
-            var modal = parm.Adapt<DefenceareaModel>().ToUpdate(HttpContext);
-
-            if (parm.RadarIds?.Length > 0)
-            {
-                string str = _RadarService.RepetitionJudgmentEdit(parm.BindingAreaId, parm.RadarIds);
-                return ToResponse(ResultCode.RepetitionJudgment, str.Trim());
-            }
-
-            return Message("OK");
-        }
+            => parm.RadarIds is { Length: > 0 }
+                ? ToResponse(ResultCode.RepetitionJudgment, rs.RepetitionJudgmentEdit(parm.BindingAreaId, parm.RadarIds).Trim())
+                : Message("OK");
     }
 }

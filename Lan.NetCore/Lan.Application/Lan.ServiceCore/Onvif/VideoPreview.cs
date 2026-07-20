@@ -577,7 +577,7 @@ namespace Lan.ServiceCore.Onvif
                 this.cameraBuffer = f_cameraBuffer;
 
                 //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(f_cameraBuffer.Ip);
-                common = _cache.Get<ONVIF_COMMON_INFO>(f_cameraBuffer.Ip);
+                common = OnvifCacheHelper.GetOrRefresh(f_cameraBuffer.Ip, _cache);
 
                 int id = LoginRecord(f_cameraBuffer.Ip, f_cameraBuffer.Username, f_cameraBuffer.Password);
                 return id;

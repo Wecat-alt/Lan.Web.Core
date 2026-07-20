@@ -23,8 +23,9 @@ namespace Lan.ServiceCore.Public
 {
     public class AlarmBackgroundService : BackgroundService
     {
-        AlarmService alarmService = new AlarmService();
-        CameraService cameraService = new CameraService();
+        private readonly IAlarmService _alarmService;
+        private readonly ICameraService _cameraService;
+        private readonly ISysConfigService _sysConfigService;
 
         private readonly ILogger<AlarmBackgroundService> _logger;
         private readonly IHubContext<MessageHub> _messageHub;
@@ -57,11 +58,19 @@ namespace Lan.ServiceCore.Public
             public bool IsRecording { get; set; } // 是否正在录像
         }
 
-        public AlarmBackgroundService(ILogger<AlarmBackgroundService> logger, IHubContext<MessageHub> messageHub)
+        public AlarmBackgroundService(
+            ILogger<AlarmBackgroundService> logger,
+            IHubContext<MessageHub> messageHub,
+            IAlarmService alarmService,
+            ICameraService cameraService,
+            ISysConfigService sysConfigService)
         {
             _instance = this; // 设置静态实例
             _logger = logger;
             _messageHub = messageHub;
+            _alarmService = alarmService;
+            _cameraService = cameraService;
+            _sysConfigService = sysConfigService;
         }
 
         public void Write(AlarmEvent alarmEvent)
@@ -204,7 +213,7 @@ namespace Lan.ServiceCore.Public
                     Longitude = _defenceArea.Longitude,
                 };
 
-                alarmService.AddAlarm(newRecord);
+                _alarmService.AddAlarm(newRecord);
                 SendAlarmPopupIfValid(newRecord);
 
                 _logger.LogDebug($"生成报警记录: 防区 {zoneId}, 记录时间: {now}, 录像文件: {alarmInfo.CurrentVideoName}, 结束标记: {isEnd}");
@@ -215,7 +224,7 @@ namespace Lan.ServiceCore.Public
         {
             var cameraInfo = string.IsNullOrWhiteSpace(newRecord.CameraIp)
                 ? null
-                : cameraService.GetInfo(newRecord.CameraIp);
+                : _cameraService.GetInfo(newRecord.CameraIp);
 
             var canSendPopup = cameraInfo != null
                 && !string.IsNullOrWhiteSpace(cameraInfo.Ip)
@@ -354,8 +363,7 @@ namespace Lan.ServiceCore.Public
             {
                 if (string.IsNullOrEmpty(GlobalVariable.FilePath))
                 {
-                    SysConfigService sysConfigService = new SysConfigService();
-                    GlobalVariable.FilePath = sysConfigService.GetSysConfigByKey("filepath").ConfigValue;
+                    GlobalVariable.FilePath = _sysConfigService.GetSysConfigByKey("filepath").ConfigValue;
                 }
 
                 WCamera[] cameras = CameraManager.GetInstance().GetBindingCameraOfDefenceArea(zoneId);

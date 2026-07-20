@@ -1,25 +1,32 @@
 ﻿using Lan.Model.Vo;
 using Lan.ServiceCore.IService;
+using Lan.ServiceCore.IService.Base;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services.Base;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Lan.ServiceCore.Services
 {
     [AppService(ServiceType = typeof(IDefenceareaService), ServiceLifetime = LifeTime.Singleton)]
     public class DefenceareaService : Repository<DefenceareaModel>, IDefenceareaService
     {
+        private readonly IRadarService RadarService;
+        private readonly ICameraService CameraService;
+        private readonly IServiceProvider _serviceProvider;
+        private IBaseService? _baseServiceLazy;
+        private IBaseService BaseService => _baseServiceLazy ??= _serviceProvider.GetRequiredService<IBaseService>();
+
+        public DefenceareaService(IRadarService radarService = null, ICameraService cameraService = null, IServiceProvider serviceProvider = null)
+        {
+            RadarService = radarService;
+            CameraService = cameraService;
+            _serviceProvider = serviceProvider;
+        }
+
         public DefenceareaModel InsertUser(DefenceareaModel sysUser)
         {
             Insertable(sysUser).ExecuteReturnIdentity();
             return sysUser;
-        }
-
-        private readonly IRadarService RadarService;
-        private readonly ICameraService CameraService;
-        public DefenceareaService(IRadarService radarService = null, ICameraService cameraService = null)
-        {
-            RadarService = radarService;
-            CameraService = cameraService;
         }
 
         /// <summary>

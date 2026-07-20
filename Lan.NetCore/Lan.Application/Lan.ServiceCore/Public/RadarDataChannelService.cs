@@ -1,4 +1,5 @@
 ﻿using Dm.util;
+using Lan.ServiceCore.IService;
 using Lan.ServiceCore.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -17,7 +18,7 @@ namespace Lan.ServiceCore.Public
 {
     public class RadarDataChannelService : BackgroundService
     {
-        TrackInfoService trackInfoService = new TrackInfoService();
+        private readonly ITrackInfoService _trackInfoService;
         private static RadarDataChannelService _instance;
         public static RadarDataChannelService Instance => _instance;
 
@@ -27,10 +28,11 @@ namespace Lan.ServiceCore.Public
         private const int CHANNEL_CAPACITY = 10000;
         private const int BATCH_SIZE = 200;
 
-        public RadarDataChannelService(ILogger<RadarDataChannelService> logger, IServiceProvider serviceProvider)
+        public RadarDataChannelService(ILogger<RadarDataChannelService> logger, IServiceProvider serviceProvider, ITrackInfoService trackInfoService)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
+            _trackInfoService = trackInfoService;
             _instance = this; 
             var options = new BoundedChannelOptions(CHANNEL_CAPACITY)
             {
@@ -120,7 +122,7 @@ namespace Lan.ServiceCore.Public
 
             try
             {
-                var result = await trackInfoService.BatchInsertAsync(batch);
+                var result = await ((TrackInfoService)_trackInfoService).BatchInsertAsync(batch);
 
                 _logger.LogInformation("成功批量插入 {Count} 条雷达数据，影响行数: {Rows}", batch.Count, result);
             }

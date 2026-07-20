@@ -1,4 +1,5 @@
-﻿using Lan.ServiceCore.Services;
+﻿using Infrastructure;
+using Lan.ServiceCore.IService;
 
 namespace Lan.ServiceCore.Public
 {
@@ -14,7 +15,7 @@ namespace Lan.ServiceCore.Public
 
         public GlobalVariable()
         {
-            SysConfigService sysConfigService = new SysConfigService();
+            var sysConfigService = App.GetService<ISysConfigService>();
             FilePath = sysConfigService.GetSysConfigByKey("filepath").ConfigValue;
             recordservicehost= sysConfigService.GetSysConfigByKey("recordservicehost").ConfigValue;
 

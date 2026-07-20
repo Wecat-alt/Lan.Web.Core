@@ -1,4 +1,6 @@
 ﻿
+using Infrastructure;
+using Lan.ServiceCore.IService;
 using Lan.ServiceCore.Services;
 using Lan.ServiceCore.TargetCollection;
 using Model;
@@ -9,7 +11,7 @@ namespace Lan.Database
     {
         public static WDefenceArea[] GetDefenceAreas()
         {
-            DefenceareaService defenceareaService = new DefenceareaService();
+            var defenceareaService = App.GetService<IDefenceareaService>();
             var ds = defenceareaService.GetAllList();
 
             List<WDefenceArea> list = new List<WDefenceArea>(ds.Count);

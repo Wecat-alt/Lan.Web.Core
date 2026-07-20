@@ -45,6 +45,7 @@ import alarm from '@/views/query/alarm_index'
 import livePreview from '@/views/livePreview/index.vue'
 import autoMap from '@/views/map/AutoMap.vue'
 import realtime_map from '@/views/map/realtime_map'
+import radar3d from '@/views/map/radar3d.vue'
 import config from '@/views/system/config/index'
 import user from '@/views/system/user/index'
 
@@ -70,6 +71,7 @@ export default defineComponent({
       realtime_map: realtime_map,
       autoMap: autoMap,
       livePreview: livePreview,
+      radar3d: radar3d,
       alarm: alarm,
       config: config,
       user: user,
@@ -89,6 +91,7 @@ export default defineComponent({
       'config',
       'autoMap',
       'livePreview',
+      'radar3d',
     ]
 
     const resolveFirstAllowedMenu = () => {

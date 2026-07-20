@@ -55,6 +55,7 @@ export default {
     radar: 'Radar',
     calibration: 'Calibration',
     gis: 'GIS',
+    radar3d: 'Radar 3D',
     wizard: 'Wizard',
     alarm: 'Alarm',
     settings: 'Settings',

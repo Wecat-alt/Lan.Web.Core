@@ -55,6 +55,7 @@ export default {
     radar: '雷达管理',
     calibration: '校准管理',
     gis: 'GIS地图',
+    radar3d: '3D雷达',
     wizard: '向导',
     alarm: '告警管理',
     settings: '系统设置',

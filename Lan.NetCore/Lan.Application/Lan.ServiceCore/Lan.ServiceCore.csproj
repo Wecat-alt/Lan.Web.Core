@@ -25,18 +25,10 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Lan.Repository\Lan.Repository.csproj" />
+		<ProjectReference Include="..\Lan.RadarSdk.Core\Lan.RadarSdk.Core.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<Reference Include="Lan.NsrRadarSdk">
-			<HintPath>Lan.NsrRadarSdk.dll</HintPath>
-		</Reference>
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Update="Lan.NsrRadarSdk.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 		<None Update="RadarToLonLat.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>

@@ -626,6 +626,15 @@ namespace CAT.NsrRadarSdk.NsrTypes
 
         //public bool Outdated { get; set; }
 
+        /// <summary>
+        /// 直接从 IRvs_Target 数组构造目标列表（供新版 SDK 适配层使用）
+        /// </summary>
+        public RVS_Target_List(IRvs_Target[] targets)
+        {
+            TargetNum = targets.Length;
+            this.targets = targets;
+        }
+
 #if false
         public RVS_Target_List(RVS_PARAM_TARGET targets, IntPtr ptr)
         {

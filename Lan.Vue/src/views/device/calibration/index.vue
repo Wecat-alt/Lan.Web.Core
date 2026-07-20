@@ -1,5 +1,20 @@
 <template>
   <div class="calibration-page">
+    <!-- ══════════ 向导模式步骤条 ══════════ -->
+    <div v-if="isWizard" class="wizard-banner">
+      <el-steps :active="3" align-center finish-status="success">
+        <el-step :title="$t('nav.radar')" />
+        <el-step :title="$t('nav.camera')" />
+        <el-step :title="$t('nav.zone')" />
+        <el-step :title="$t('nav.calibration')" />
+      </el-steps>
+      <p class="wizard-banner-desc">第 4 步：选择防区和相机，完成校准后进入 GIS 地图</p>
+      <div class="wizard-banner-actions">
+        <el-button @click="wizardExit">退出向导</el-button>
+        <el-button type="primary" @click="wizardFinish">完成，进入 GIS 地图</el-button>
+      </div>
+    </div>
+
     <section class="toolbar-card">
       <el-form
         :model="queryParams"
@@ -37,6 +52,21 @@
               :key="dict.id"
               :label="dict.ip"
               :value="dict.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('radar.ip')" prop="radarIp">
+          <el-select
+            v-model="queryParams.radarIp"
+            clearable
+            class="filter-select"
+            @change="handleRadarChange"
+          >
+            <el-option
+              v-for="dict in radarOptions"
+              :key="dict.ip"
+              :label="dict.ip"
+              :value="dict.ip"
             />
           </el-select>
         </el-form-item>
@@ -517,6 +547,7 @@ import {
   updateCamera,
 } from '@/api/device/camera'
 import { allDefencearea } from '@/api/device/defencearea.js'
+import { listRadarByAreaId } from '@/api/device/radar'
 import LocalPlayerWindow from '@/components/LocalPlayerWindow.vue'
 import { initSignalR, setSignalRReceiveEnabled } from '@/utils/signalRUtils'
 import PTZ from '@/views/components/PTZ'
@@ -525,7 +556,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 const { proxy } = getCurrentInstance()
 const defenceareaOptions = ref([])
 const cameraOptions = ref([])
+const radarOptions = ref([])
 const speed = ref(0.3)
+const isWizard = ref(localStorage.getItem('wizard') === 'calibration')
 const state = reactive({
   form: {},
   rules: {
@@ -563,6 +596,7 @@ const queryParams = reactive({
   defenceareaId: undefined,
   cameraId: undefined,
   cameraIp: '',
+  radarIp: '',
 })
 const jz = ref('30')
 const camerarPointAngle = ref(0)
@@ -664,6 +698,16 @@ AddCalibration = async function () {
   maybeFinishWizardAfterCalibration()
 }
 
+// ══════════ 向导控制 ══════════
+function wizardFinish() {
+  try { localStorage.removeItem('wizard') } catch (e) {}
+  try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' })) } catch (e) {}
+}
+function wizardExit() {
+  try { localStorage.removeItem('wizard') } catch (e) {}
+  try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' })) } catch (e) {}
+}
+
 function stopTarget() {
   if (form.value.id == undefined) {
     ElMessageBox.alert(proxy.$t('zone.select_camera'), proxy.$t('common.ptz_Control'), {
@@ -713,6 +757,7 @@ handall()
 function handCamera() {
   queryParams.cameraId = ''
   cameraOptions.value = []
+  radarOptions.value = []
 
   const defenceareaId = queryParams.defenceareaId
   getCameraByDefenceAreaId(defenceareaId).then((response) => {
@@ -723,11 +768,21 @@ function handCamera() {
     getList(queryParams.cameraId)
     getCalibration(queryParams.cameraIp, queryParams.defenceareaId)
   })
+
+  // 加载该防区的雷达列表
+  listRadarByAreaId(defenceareaId).then((response) => {
+    radarOptions.value = response.data.data || []
+    if (radarOptions.value.length > 0) {
+      queryParams.radarIp = radarOptions.value[0].ip
+    }
+    console.log('获取到的雷达列表：', radarOptions.value)
+  })
 }
 
 const handleDefenceareaChange = async (defenceareaId) => {
   queryParams.cameraId = ''
   cameraOptions.value = []
+  radarOptions.value = []
 
   getCameraByDefenceAreaId(defenceareaId).then((response) => {
     console.log('获取到的相机数据：', response.data.data)
@@ -737,6 +792,22 @@ const handleDefenceareaChange = async (defenceareaId) => {
     getList(queryParams.cameraId)
     getCalibration(queryParams.cameraIp, queryParams.defenceareaId)
   })
+
+  // 加载该防区的雷达列表
+  listRadarByAreaId(defenceareaId).then((response) => {
+    radarOptions.value = response.data.data || []
+    if (radarOptions.value.length > 0) {
+      queryParams.radarIp = radarOptions.value[0].ip
+    }
+    console.log('获取到的雷达列表：', radarOptions.value)
+  })
+}
+
+function handleRadarChange(radarIp) {
+  queryParams.radarIp = radarIp || ''
+  // 切换雷达时清除现有点
+  points = []
+  console.log('[Calibration] 切换到雷达:', radarIp)
 }
 function cameraChange(cameraId) {
   getList(cameraId)
@@ -878,19 +949,102 @@ function initRadar() {
   radarCtx.value.save()
   radarCtx.value.beginPath()
   radarCtx.value.moveTo(500, 700)
-
-  //已知 x=1200；y=600；
   radarCtx.value.arc(500, 700, (500 / 250) * 280, (225 * Math.PI) / 180, (315 * Math.PI) / 180)
   radarCtx.value.closePath()
   radarCtx.value.lineWidth = '2'
-  radarCtx.value.fillStyle = 'rgba(200,200, 9, 0.2)'
+  radarCtx.value.fillStyle = 'rgba(200, 200, 9, 0.2)'
   radarCtx.value.strokeStyle = 'red'
   radarCtx.value.stroke()
-  radarCtx.value.fill() //填充
+  radarCtx.value.fill()
   radarCtx.value.restore()
+
+  // 启动探测波纹动画
+  initRadarRipple()
 }
+
+// ══════════ 探测波纹动画 ══════════
+let rippleAnimationId = null
+let activeRipples = []
+const RIPPLE_COUNT = 3
+const RIPPLE_INTERVAL = 1500 // 每1.5秒发射一条
+const RIPPLE_LIFETIME = 4500 // 每条存活4.5秒，保持3条同时可见
+const SECTOR_CX = 500
+const SECTOR_CY = 700
+const SECTOR_R = (500 / 250) * 280
+const SECTOR_A1 = (225 * Math.PI) / 180
+const SECTOR_A2 = (315 * Math.PI) / 180
+
+function initRadarRipple() {
+  activeRipples = []
+  for (let i = 0; i < RIPPLE_COUNT; i++) {
+    activeRipples.push({ startTime: performance.now() + i * (RIPPLE_INTERVAL / RIPPLE_COUNT) })
+  }
+
+  let lastEmitTime = performance.now()
+
+  function drawFrame(now) {
+    // 发射新波纹
+    if (now - lastEmitTime >= RIPPLE_INTERVAL) {
+      activeRipples.push({ startTime: now })
+      lastEmitTime = now
+      if (activeRipples.length > RIPPLE_COUNT + 1) activeRipples.shift()
+    }
+
+    const canvas = radarCanvas.value
+    const ctx = radarCtx.value
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // 扇形填充 + 描边
+    ctx.save()
+    ctx.beginPath()
+    ctx.moveTo(SECTOR_CX, SECTOR_CY)
+    ctx.arc(SECTOR_CX, SECTOR_CY, SECTOR_R, SECTOR_A1, SECTOR_A2)
+    ctx.closePath()
+    ctx.fillStyle = 'rgba(200, 200, 9, 0.2)'
+    ctx.fill()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'red'
+    ctx.stroke()
+    ctx.restore()
+
+    // 探测波纹
+    activeRipples = activeRipples.filter((r) => {
+      const elapsed = now - r.startTime
+      if (elapsed > RIPPLE_LIFETIME) return false
+      const progress = elapsed / RIPPLE_LIFETIME
+      const radius = progress * SECTOR_R
+      if (radius < 1) return true // 太小不画，但保留
+      const opacity = 1 - progress
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(SECTOR_CX, SECTOR_CY, radius, SECTOR_A1, SECTOR_A2)
+      ctx.strokeStyle = `rgba(36, 180, 3, ${opacity.toFixed(2)})`
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.restore()
+      return true
+    })
+
+    rippleAnimationId = requestAnimationFrame(drawFrame)
+  }
+
+  rippleAnimationId = requestAnimationFrame(drawFrame)
+}
+
 let points = []
-const POINT_LIFETIME = 1000 // 每个点显示5秒
+const POINT_LIFETIME = 3000 // 每个点显示3秒
+const TARGET_COLORS = {
+  人: { fill: '#22c55e', stroke: '#16a34a' },  // 绿色
+  车: { fill: '#3b82f6', stroke: '#2563eb' },  // 蓝色
+  未知: { fill: '#6b7280', stroke: '#4b5563' }, // 灰色
+}
+
+function mapTargetType(typeNum) {
+  if (typeNum === 0 || typeNum === 1) return '人'
+  if (typeNum === 2 || typeNum === 3) return '车'
+  return '未知'
+}
+
 function initPoints(longLinkApi, acceptMsg, longLinkSendMsg) {
   initSignalR({
     api: longLinkApi,
@@ -899,22 +1053,25 @@ function initPoints(longLinkApi, acceptMsg, longLinkSendMsg) {
     onAcceptMessage: (res) => {
       const serverData = JSON.parse(res)
 
-      // 添加新点并记录添加时间
+      // 按雷达IP过滤
+      if (queryParams.radarIp && serverData.radarIp && serverData.radarIp !== queryParams.radarIp) {
+        return
+      }
+
       const x = parseFloat(serverData.axesX) + 500
       const y = 700 - parseFloat(serverData.axesY)
-      const targetType = '人'
+      const typeName = mapTargetType(serverData.targetType)
       points.push({
         x,
         y,
         targetId: serverData.targetId,
-        targetType,
+        targetType: typeName,
+        distance: serverData.distance ? parseFloat(serverData.distance).toFixed(1) : '--',
+        azimuth: serverData.azimuthAngle ? parseFloat(serverData.azimuthAngle).toFixed(1) : '--',
         timestamp: Date.now(),
       })
 
-      // 限制数组大小
-      if (points.length > 50) {
-        points.shift()
-      }
+      if (points.length > 50) points.shift()
     },
   }).then(({ connection: sharedConnection, unsubscribe }) => {
     connection.value = sharedConnection
@@ -923,26 +1080,78 @@ function initPoints(longLinkApi, acceptMsg, longLinkSendMsg) {
   })
 
   animate()
-  //requestAnimationFrame(initPoints);
 }
+// 兼容老浏览器的圆角矩形绘制
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.arcTo(x + w, y, x + w, y + r, r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+  ctx.lineTo(x + r, y + h)
+  ctx.arcTo(x, y + h, x, y + h - r, r)
+  ctx.lineTo(x, y + r)
+  ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
+  ctx.fill()
+}
+
 function animate() {
-  // 清空画布
-  ctx.value.clearRect(0, 0, canvas.value.width, canvas.value.height)
+  const ctx2d = ctx.value
+  ctx2d.clearRect(0, 0, canvas.value.width, canvas.value.height)
 
   const now = Date.now()
-
-  // 移除过期的点
   points = points.filter((point) => now - point.timestamp < POINT_LIFETIME)
 
-  // 绘制所有点（可添加渐变效果）
   points.forEach((point) => {
-    ctx.value.beginPath()
-    ctx.value.font = '10px Verdana'
-    ctx.value.strokeStyle = 'red'
-    ctx.value.arc(point.x, point.y, 3, 0, 2 * Math.PI)
-    ctx.value.fillStyle = 'red'
-    ctx.value.fill()
-    ctx.value.closePath()
+    const elapsed = now - point.timestamp
+    const alpha = Math.max(0.4, 1 - elapsed / POINT_LIFETIME)
+
+    ctx2d.save()
+    ctx2d.globalAlpha = alpha
+
+    // 实心圆点
+    ctx2d.beginPath()
+    ctx2d.arc(point.x, point.y, 4, 0, 2 * Math.PI)
+    ctx2d.fillStyle = '#ef4444'
+    ctx2d.fill()
+    ctx2d.strokeStyle = '#dc2626'
+    ctx2d.lineWidth = 1
+    ctx2d.stroke()
+
+    // 信息标签: "ID:123 150m 45°"
+    const label = `ID:${point.targetId} ${point.distance}m ${point.azimuth}°`
+    const fontSize = 11
+    ctx2d.font = `${fontSize}px monospace`
+    const labelW = ctx2d.measureText(label).width + 10
+    const labelH = 16
+    // 标签放在目标点右上方，拉开距离
+    const offsetX = 22
+    const offsetY = -38
+    const labelX = point.x + offsetX
+    const labelY = point.y + offsetY
+
+    // 指向线
+    ctx2d.strokeStyle = 'rgba(255, 255, 255, 0.5)'
+    ctx2d.lineWidth = 1
+    ctx2d.setLineDash([3, 2])
+    ctx2d.beginPath()
+    ctx2d.moveTo(point.x, point.y)
+    ctx2d.lineTo(labelX, labelY + labelH / 2)
+    ctx2d.stroke()
+    ctx2d.setLineDash([])
+
+    // 标签背景（兼容老浏览器的圆角矩形）
+    ctx2d.fillStyle = 'rgba(0, 0, 0, 0.75)'
+    roundRect(ctx2d, labelX, labelY, labelW, labelH, 3)
+
+    // 标签文字
+    ctx2d.fillStyle = '#fff'
+    ctx2d.textBaseline = 'middle'
+    ctx2d.fillText(label, labelX + 5, labelY + labelH / 2)
+
+    ctx2d.restore()
   })
 
   requestAnimationFrame(animate)
@@ -989,6 +1198,10 @@ onBeforeUnmount(() => {
   if (typeof unsubscribeSignalR === 'function') {
     unsubscribeSignalR()
     unsubscribeSignalR = null
+  }
+  if (rippleAnimationId !== null) {
+    cancelAnimationFrame(rippleAnimationId)
+    rippleAnimationId = null
   }
 })
 </script>
@@ -1585,5 +1798,27 @@ onBeforeUnmount(() => {
   .calibration-distance--compact {
     flex-wrap: wrap;
   }
+}
+
+/* ══════════ 向导步骤条 ══════════ */
+.wizard-banner {
+  max-width: 900px;
+  margin: 0 auto 16px;
+  padding: 20px 24px 14px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.wizard-banner-desc {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: #909399;
+}
+.wizard-banner-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
 }
 </style>

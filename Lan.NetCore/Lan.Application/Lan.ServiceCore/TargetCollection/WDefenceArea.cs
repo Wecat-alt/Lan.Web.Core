@@ -1,6 +1,7 @@
 ﻿using Dm.util;
 using Infrastructure;
 using Lan.Infrastructure.CameraOnvif;
+using Lan.ServiceCore.IService;
 using Lan.ServiceCore.Onvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services;
@@ -34,7 +35,6 @@ namespace Lan.ServiceCore.TargetCollection
         private readonly IMemoryCacheService? _cache;
 
         #region 成员变量
-        AlarmService alarmService = new AlarmService();
 
         /// <summary>
         /// 绘制区域相对防区的坐标
@@ -236,16 +236,19 @@ namespace Lan.ServiceCore.TargetCollection
             //_MainRadar = defencearea.MainRadar;
 
             //RadarDefenceEnable();
-            DrawPolygonService drawPolygonService = new DrawPolygonService();
+            var drawPolygonService = App.GetService<IDrawPolygonService>();
 
-            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 1);
-            ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
+            if (_radars.Count > 0)
+            {
+                var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_radars[0].ID, 1);
+                ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
 
-            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 2);
-            ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
+                var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_radars[0].ID, 2);
+                ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
 
-            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 3);
-            ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
+                var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_radars[0].ID, 3);
+                ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
+            }
 
         }
 
@@ -255,16 +258,19 @@ namespace Lan.ServiceCore.TargetCollection
             ListRadarPolygon2 = new List<Coordinate[]>();
             ListRadarPolygon3 = new List<Coordinate[]>();
 
-            DrawPolygonService drawPolygonService = new DrawPolygonService();
+            if (_radars.Count > 0)
+            {
+                DrawPolygonService drawPolygonService = (DrawPolygonService)App.GetService<IDrawPolygonService>();
 
-            var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 1);
-            ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
+                var drawPolygon1 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_radars[0].ID, 1);
+                ListRadarPolygon1 = ConvertListRadarPolygon(drawPolygon1);
 
-            var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 2);
-            ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
+                var drawPolygon2 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_radars[0].ID, 2);
+                ListRadarPolygon2 = ConvertListRadarPolygon(drawPolygon2);
 
-            var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_nID, 3);
-            ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
+                var drawPolygon3 = drawPolygonService.GetDrawPolygonByDefenceAreaId(_radars[0].ID, 3);
+                ListRadarPolygon3 = ConvertListRadarPolygon(drawPolygon3);
+            }
         }
 
         public void Dispose()
@@ -329,14 +335,14 @@ namespace Lan.ServiceCore.TargetCollection
             if (_nID > 0)
             {
                 WCamera[] cameras = CameraManager.GetInstance().GetBindingCameraOfDefenceArea(_nID);
-                CameraService cameraService = new CameraService();
+                var cameraService = App.GetService<CameraService>();
                 foreach (var cam in cameras)
                 {
                     cam.BindToDefenceArea(-1);
                     cameraService.UpdateSql($"UPDATE camera SET BindingAreaId = -1 WHERE ID = '{cam.ID}'");
                 }
                 WRadar[] radars = RadarManager.GetInstance().GetBindingRadarOfDefenceArea(_nID);
-                RadarService radarService = new RadarService();
+                var radarService = App.GetService<RadarService>();
                 foreach (var radar in radars)
                 {
                     radar.BindToDefenceArea(-1);

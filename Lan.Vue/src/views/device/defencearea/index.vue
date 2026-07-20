@@ -1,5 +1,77 @@
 <template>
   <div>
+    <!-- ══════════ 向导模式 ══════════ -->
+    <div v-if="_isWizard" class="wizard-layout">
+      <div class="wizard-steps">
+        <el-steps :active="2" align-center finish-status="success">
+          <el-step :title="$t('nav.radar')" />
+          <el-step :title="$t('nav.camera')" />
+          <el-step :title="$t('nav.zone')" />
+          <el-step :title="$t('nav.calibration')" />
+        </el-steps>
+      </div>
+      <div class="wizard-body">
+        <div class="wizard-header">
+          <h3>第 3 步：{{ $t('common.add') }}{{ $t('nav.zone') }}</h3>
+          <p class="wizard-desc">请创建防区并绑定雷达和相机</p>
+        </div>
+        <el-form ref="wizardFormRef" :model="form" :rules="rules" label-width="140px" class="wizard-form">
+          <el-row :gutter="20">
+            <el-col :lg="12">
+              <el-form-item :label="$t('zone.name')" prop="name">
+                <el-input v-model="form.name" placeholder="周界防区1" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.defenceRadius')" prop="defenceRadius">
+                <el-input v-model="form.defenceRadius" placeholder="500" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('zone.latitude')">
+                <el-input v-model="form.latitude" placeholder="39.9042" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('zone.longitude')">
+                <el-input v-model="form.longitude" placeholder="116.4074" />
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('common.camera')">
+                <el-select v-model="form.cameraId" clearable class="w-select">
+                  <el-option v-for="dict in cameraOptions" :key="dict.id" :label="dict.ip" :value="dict.id" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('radar.ip')">
+                <el-select v-model="form.radarId" clearable class="w-select">
+                  <el-option v-for="dict in radarOptions" :key="dict.id" :label="dict.ip" :value="dict.id" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :lg="12">
+              <el-form-item :label="$t('zone.defenceEnable')">
+                <el-radio-group v-model="form.defenceEnable">
+                  <el-radio v-for="dict in statusOptions" :key="dict.dictValue" :label="parseInt(dict.dictValue)">
+                    {{ dict.dictValue === '1' ? $t('common.enabled') : $t('common.disabled') }}
+                  </el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+        <div class="wizard-actions">
+          <el-button @click="wizardExit">{{ $t('common.cancel') }}</el-button>
+          <el-button @click="wizardSkip">跳过</el-button>
+          <el-button type="primary" @click="wizardSubmit" :loading="wizardSubmitting">提交并继续</el-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ 普通模式 ══════════ -->
+    <template v-else>
     <el-form
       :model="queryParams"
       label-position="right"
@@ -226,6 +298,7 @@
         <el-button type="primary" @click="submitForm">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
+    </template>
   </div>
 </template>
 
@@ -315,6 +388,9 @@ export default {
           },
         ],
       },
+      // 向导模式标记
+      _isWizard: false,
+      wizardSubmitting: false,
     }
   },
   created() {
@@ -398,10 +474,15 @@ export default {
     },
     handleAdd() {
       this.reset()
-      this.open = true
-      this.title = this.$t('common.add')
-      this.fillMapCenterToForm()
       this._isWizard = localStorage.getItem('wizard') === 'defencearea'
+      if (this._isWizard) {
+        this.title = this.$t('common.add') + ' - ' + this.$t('nav.zone')
+        this.fillMapCenterToForm()
+      } else {
+        this.open = true
+        this.title = this.$t('common.add')
+        this.fillMapCenterToForm()
+      }
     },
     handleUpdate(row) {
       this.reset()
@@ -423,7 +504,8 @@ export default {
       })
     },
     submitForm: function () {
-      this.$refs['formRef'].validate((valid) => {
+      const formRefName = this._isWizard ? 'wizardFormRef' : 'formRef'
+      this.$refs[formRefName].validate((valid) => {
         if (this.form.defenceEnable == 1) this.form.defenceEnableName = '布防'
         else this.form.defenceEnableName = '撤防'
 
@@ -552,6 +634,32 @@ export default {
         }
       })
     },
+    // ══════════ 向导方法 ══════════
+    wizardSubmit() {
+      this.wizardSubmitting = true
+      this.submitForm()
+      setTimeout(() => { this.wizardSubmitting = false }, 3000)
+    },
+    wizardSkip() {
+      try { localStorage.setItem('wizard', 'calibration') } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'calibration' })) } catch (e) {}
+    },
+    wizardExit() {
+      try { localStorage.removeItem('wizard') } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' })) } catch (e) {}
+    },
   },
 }
 </script>
+
+<style scoped>
+/* ══════════ 向导布局 ══════════ */
+.wizard-layout { min-height: 100vh; background: #f5f7fa; padding: 24px 32px; }
+.wizard-steps { max-width: 800px; margin: 0 auto 32px; padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+.wizard-body { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+.wizard-header { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #ebeef5; }
+.wizard-header h3 { margin: 0 0 8px; font-size: 18px; color: #303133; }
+.wizard-desc { margin: 0; font-size: 14px; color: #909399; }
+.wizard-form { margin-bottom: 24px; }
+.wizard-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px; border-top: 1px solid #ebeef5; }
+</style>

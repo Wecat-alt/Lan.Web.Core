@@ -109,6 +109,12 @@ const routes = [
     meta: { requiresAuth: true, menuKey: 'config' },
     component: () => import('@/views/system/config/index'),
   },
+  {
+    path: '/radar3d',
+    name: 'radar3d',
+    meta: { requiresAuth: true, menuKey: 'radar3d' },
+    component: () => import('@/views/map/radar3d.vue'),
+  },
 ]
 
 // 创建路由实例

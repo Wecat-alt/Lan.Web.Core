@@ -12,18 +12,18 @@ using System.Threading.Tasks;
 
 namespace Lan.ServiceCore.IService.Base
 {
-    public interface IBaseService 
+    public interface IBaseService
     {
-        //void LoadCalibration(int status);
-        //void LoadDefenceAreaAdd(int id);
-        //void LoadDefenceAreaUpdate(DefenceareaModel model);
-        //void LoadDefenceAreaDelete(int _id);
-        //void LoadDefenceAreaStatus(string status);
-        //void LoadRadarAdd(int id);
-        //void LoadDeleteRadar(string ip);
-        //void LoadCameraAdd(int _id);
-        //void LoadCameraUpdate(int _id);
-        //void LoadUnBindCamera(string status, string id, string ip);
-        //void LoadUnBindCamera(string status, string ip);
+        void LoadCalibration();
+        void LoadDefenceAreaAdd(int id);
+        void LoadDefenceAreaUpdate(DefenceareaModel model);
+        void LoadDefenceAreaUpdate(int status);
+        void LoadDefenceAreaDelete(int _id);
+        void LoadRadarAdd(int id);
+        void LoadDeleteRadar(string ip);
+        void LoadCameraAdd(int _id);
+        void LoadCameraUpdate(int _id);
+        void LoadUnBindCamera(string ip);
+        void LoadUnBindCamera(string status, string ip);
     }
 }

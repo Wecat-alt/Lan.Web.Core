@@ -1,20 +1,9 @@
-﻿using Dm.util;
-using Lan.Infrastructure.Geometries;
-using Lan.ServiceCore.IService;
+﻿using Lan.Infrastructure.Geometries;
 using Lan.ServiceCore.Public;
-using Lan.ServiceCore.Services;
 using Lan.ServiceCore.Signalr;
 using Lan.ServiceCore.WebScoket;
-using Lan.Shared;
-using Model;
-using NetTopologySuite.Algorithm;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.Index.HPRtree;
-using NetTopologySuite.Operation.Distance;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using System.Collections.Concurrent;
-using System.Drawing;
 
 namespace Lan.ServiceCore.TargetCollection
 {
@@ -75,171 +64,217 @@ namespace Lan.ServiceCore.TargetCollection
             _defenceArea = defenceArea;
         }
 
-        AlarmService alarmService = new AlarmService();
-        TrackInfoService trackInfoService = new TrackInfoService();
-
 
 
         /// <summary>
-        /// 添加雷达的报警信息到目标缓存队列
+        /// 添加雷达的报警信息到目标缓存队列。
+        /// 四层管线：QuickFilter → Transform → PolygonFilter → Dispatch
         /// </summary>
-        /// <param name="radar">发生报警的雷达</param>
-        /// <returns>是否成功添加了目标</returns>
-        internal bool AddTarget(WRadar radar, List<Coordinate[]> ListRadarPolygon1, List<Coordinate[]> ListRadarPolygon2, List<Coordinate[]> ListRadarPolygon3)
+        internal bool AddTarget(WRadar radar, List<Coordinate[]> ListRadarPolygon1,
+            List<Coordinate[]> ListRadarPolygon2, List<Coordinate[]> ListRadarPolygon3)
         {
-           
             bool isAdded = false;
-            List<SendMS> radarTacks = new List<SendMS>();
-            var AlarmId = -1;// alarmService.GetInfos(DefenceArea.ID);
+            var radarTacks = new List<SendMS>();
+            const int AlarmId = -1;
 
-            //var northDeviation = double.Parse(radar.NorthDeviationAngle);
-            var radarLat = Convert.ToDouble(radar.Latitude);
-            var radarLon = Convert.ToDouble(radar.Longitude);
-            var halfDefenceAngle = radar.DefenceAngle / 2f;
-            //var defenceRadius = DefenceArea.DefenceRadius;
-            //var radarDefenceRadius = radar.DefenceRadius;
-            //var areaId = DefenceArea.ID;
+            // ═══════ 批次级常量预计算（原来每个 target 都算一遍） ═══════
+            double radarLat = Convert.ToDouble(radar.Latitude);
+            double radarLon = Convert.ToDouble(radar.Longitude);
+            double northDev = double.Parse(radar.NorthDeviationAngle);
+            double latRad   = radarLat * Math.PI / 180.0;
+            double lonRad   = radarLon * Math.PI / 180.0;
+            double cosLat   = Math.Cos(latRad);
+            double sinLat   = Math.Sin(latRad);
+            float  halfAngle = radar.DefenceAngle / 2f;
+            float  defRadius = DefenceArea.DefenceRadius;
+            float  rdrRadius = radar.DefenceRadius;
+            // 预筛安全边距：rotation 保距，translation 偏移 ≤ √(X²+Y²) ≤ 10m
+            const float preFilterMargin = 10f;
+            float  preFilterMaxDist = Math.Min(defRadius, rdrRadius) + preFilterMargin;
 
             foreach (var tar in radar.RadarTargets.Targets)
             {
+                // ── Stage 1: QuickFilter（廉价拒绝，避免昂贵的 RadarTargetItem 构造） ──
+                if (!PassQuickFilter(tar, halfAngle, preFilterMaxDist))
+                    continue;
+
                 DateTime now = DateTime.Now;
+                string utime = now.ToString("yyyy-MM-dd HH:mm:ss:ffffff");
 
-                float x = tar.X;
-
-                if (radar.InvertX)  //判断是否需要对X坐标反向
-                    x = -x;
-
-
-                var ss = Math.Sqrt(tar.AxesX * tar.AxesX + tar.AxesY * tar.AxesY);
-
-                string utime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss:ffffff");
-                RadarTargetItem tarItem = new RadarTargetItem(x, tar.Y, tar.SpeedY, tar.SpeedX, now, radar, tar.Type, tar.AxesX, tar.AxesY, tar.AzimuthAngle, tar.Id);
-
+                // ── Stage 2: Transform（昂贵运算，只对通过预筛的目标执行） ──
+                float x = radar.InvertX ? -tar.X : tar.X;
+                var tarItem = new RadarTargetItem(x, tar.Y, tar.SpeedY, tar.SpeedX,
+                    now, radar, tar.Type, tar.AxesX, tar.AxesY, tar.AzimuthAngle, tar.Id);
                 tarItem.TargetId = (int)tar.Id;
-                if (tarItem.Distance > DefenceArea.DefenceRadius)
-                {
-                    //距离超过防区半径的目标，剔除
+
+                // 精确距离过滤（与原来逻辑完全相同）
+                if (tarItem.Distance > defRadius || tarItem.Distance > rdrRadius)
                     continue;
-                }
-                if (tarItem.Distance > radar.DefenceRadius)
-                {
-                    //距离超过防区半径的目标，剔除
+
+                var (lat, lng) = TransformLatLon(
+                    latRad, lonRad, cosLat, sinLat, northDev,
+                    tarItem.AxesX, tarItem.AxesY, tarItem.AzimuthAngle);
+
+                // ── Stage 3: PolygonFilter（多边形判读，逻辑不变） ──
+                if (!PassPolygonFilter(lat, lng, ListRadarPolygon1, ListRadarPolygon2))
                     continue;
-                }
 
-                if (Math.Abs(tar.AzimuthAngle) > halfDefenceAngle)
-                {
-                    continue;
-                }
-                float B_AzimuthAngle = float.Parse(radar.NorthDeviationAngle);
-                Double[] AlarmLonLat = Share.GetLatLon(radarLat, radarLon, double.Parse(B_AzimuthAngle.ToString()), tarItem.AxesX, tarItem.AxesY, tarItem.AzimuthAngle);
+                // ── Stage 4: Dispatch（构造消息、写入下游队列） ──
+                lat = Math.Round(lat, 6);
+                lng = Math.Round(lng, 6);
 
-                if (ListRadarPolygon1.Count > 0)
-                {
-                    if (!TrimDrawpolygon(AlarmLonLat, ListRadarPolygon1))
-                    {
-                        continue;
-                    }
-                }
-                if (TrimDrawpolygon(AlarmLonLat, ListRadarPolygon2))
-                {
-                    continue;
-                }
-
-                var lat = Math.Round(AlarmLonLat[0], 6);
-                var lng = Math.Round(AlarmLonLat[1], 6);
-
-                SendMS sms = new SendMS { };
-                sms.TargetId = tarItem.TargetId;
-                sms.TargetType = (int)tar.Type;
-                sms.SpeedX = tar.SpeedX.ToString();
-                sms.SpeedY = tar.SpeedY.ToString();
-                sms.Lat = lat;
-                sms.Lng = lng;
-                sms.DateTime = tarItem.UpdateTime.ToString("mmss");
-                sms.Distance = tar.Distance.ToString();
-                sms.AzimuthAngle = tar.AzimuthAngle.ToString();
-                sms.NorthDeviationAngle = radar.NorthDeviationAngle;
-                sms.RadarIp = radar.Ip;
-                sms.AxesX = tar.AxesX;
-                sms.AxesY = tar.AxesY;
-                sms.AreaId = DefenceArea.ID;
-                radarTacks.Add(sms);
-                Worker.AddTarget(sms);
-
-
-                TrackInfo trackInfo = new TrackInfo();
-                trackInfo.AlarmId = AlarmId;
-                trackInfo.UpdateTime = tarItem.UpdateTime;
-                trackInfo.Lat = lat;
-                trackInfo.Lng = lng;
-                trackInfo.TargetId = tarItem.TargetId;
-                trackInfo.X = tar.X;
-                trackInfo.Y = tar.Y;
-                trackInfo.RadarIp = radar.Ip;
-                trackInfo.AreaId = DefenceArea.ID;
-                trackInfo.UpTime = utime;
-
-                // 添加到报警队列（非阻塞操作）
-                if (AlarmBackgroundService.Instance != null)
-                {
-                    var alarmEvent = new AlarmEvent
-                    {
-                        ZoneId = tarItem.DefenceId.ToString(),
-                        AlarmTime = now,
-                        TargetId = tarItem.TargetId,
-                        RadarIp = radar.Ip
-                    };
-
-                    AlarmBackgroundService.Instance.Write(alarmEvent);
-                }
-                else
-                {
-                    // 如果服务未启动，记录日志或采取其他措施
-                    Console.WriteLine("AlarmBackgroundService 未初始化");
-                }
-
-                // 使用静态实例写入Channel
-                if (RadarDataChannelService.Instance != null)
-                {
-                    RadarDataChannelService.Instance.Write(trackInfo);
-                }
-                else
-                {
-                    // 如果服务未启动，记录日志或采取其他措施
-                    Console.WriteLine("RadarDataChannelService 未初始化");
-                }
-
-                //_radarTargetQueue.Enqueue(tarItem);
+                radarTacks.Add(DispatchTarget(
+                    radar, tar, tarItem, lat, lng, now, utime, AlarmId, DefenceArea.ID));
                 isAdded = true;
             }
-            WDefenceArea.AddTarget(radarTacks);
 
+            WDefenceArea.AddTarget(radarTacks);
             return isAdded;
         }
 
-        private bool TrimDrawpolygon(Double[] AlarmLonLat, List<Coordinate[]> ListRadarPolygon)
+        // ═══════════════ Stage 1: QuickFilter ═══════════════
+
+        /// <summary>廉价预筛：角度过滤 + 保守距离过滤。拒绝大部分目标，避免后续昂贵运算。</summary>
+        private static bool PassQuickFilter(IRvs_Target tar, float halfAngle, float maxDist)
         {
+            if (Math.Abs(tar.AzimuthAngle) > halfAngle)
+                return false;
+
+            float rawDist = MathF.Sqrt(tar.AxesX * tar.AxesX + tar.AxesY * tar.AxesY);
+            return rawDist <= maxDist;
+        }
+
+        // ═══════════════ Stage 2: Transform ═══════════════
+
+        /// <summary>
+        /// 雷达坐标 → 经纬度（数学等价于原 Share.GetLatLon，但使用批次级预计算常量）。
+        /// bearingRad = NorthDeviationAngle - (-AzimuthAngle) = NorthDev + Azimuth
+        /// </summary>
+        private static (double Lat, double Lng) TransformLatLon(
+            double latRad, double lonRad, double cosLat, double sinLat, double northDev,
+            float axesX, float axesY, float azimuthAngle)
+        {
+            const double earthRadius = 6371393.0;
+
+            double dist = Math.Sqrt(axesX * axesX + axesY * axesY);
+            if (dist <= 0)
+                return (latRad * 180.0 / Math.PI, lonRad * 180.0 / Math.PI);
+
+            double bearingRad = (northDev + azimuthAngle) * Math.PI / 180.0;
+            double angularDist = dist / earthRadius;
+
+            double newLatRad = Math.Asin(
+                sinLat * Math.Cos(angularDist) +
+                cosLat * Math.Sin(angularDist) * Math.Cos(bearingRad));
+
+            double newLonRad = lonRad + Math.Atan2(
+                Math.Sin(bearingRad) * Math.Sin(angularDist) * cosLat,
+                Math.Cos(angularDist) - sinLat * Math.Sin(newLatRad));
+
+            return (newLatRad * 180.0 / Math.PI, newLonRad * 180.0 / Math.PI);
+        }
+
+        // ═══════════════ Stage 3: PolygonFilter ═══════════════
+
+        /// <summary>多边形判读（与原来 TrimDrawpolygon 逻辑完全一致）</summary>
+        private static bool PassPolygonFilter(double lat, double lng,
+            List<Coordinate[]> includePolys, List<Coordinate[]> excludePolys)
+        {
+            // 包含区：目标必须在区域内
+            if (includePolys.Count > 0 && !IsPointInAnyPolygon(lat, lng, includePolys))
+                return false;
+
+            // 排除区：目标不能在区域内
+            if (IsPointInAnyPolygon(lat, lng, excludePolys))
+                return false;
+
+            return true;
+        }
+
+        private static bool IsPointInAnyPolygon(double lat, double lng, List<Coordinate[]> polygons)
+        {
+            if (polygons == null || polygons.Count == 0)
+                return false;
+
             var geoService = new GeoService();
+            var point = new Coordinate(lat, lng);
 
-            if (ListRadarPolygon == null)
-                return true;
-
-            bool inPolygon = false;
-            if (ListRadarPolygon.Count > 0)
+            foreach (var coords in polygons)
             {
-                foreach (var coordinates in ListRadarPolygon)
-                {
-
-                    Coordinate cc = new Coordinate(AlarmLonLat[0], AlarmLonLat[1]);
-                    inPolygon = geoService.IsPointInPolygon(cc, coordinates);
-                    if (inPolygon)
-                    {
-                        return inPolygon;
-                    }
-                }
+                if (geoService.IsPointInPolygon(point, coords))
+                    return true;
             }
-            return inPolygon;
+            return false;
+        }
+
+        // ═══════════════ Stage 4: Dispatch ═══════════════
+
+        /// <summary>构造消息并写入下游队列（与原来逻辑完全一致）</summary>
+        private static SendMS DispatchTarget(WRadar radar, IRvs_Target tar, RadarTargetItem tarItem,
+            double lat, double lng, DateTime now, string utime, int alarmId, int areaId)
+        {
+            // SendMS → Worker (SignalR 实时推送)
+            var sms = new SendMS
+            {
+                TargetId             = tarItem.TargetId,
+                TargetType           = (int)tar.Type,
+                SpeedX               = tar.SpeedX.ToString(),
+                SpeedY               = tar.SpeedY.ToString(),
+                Lat                  = lat,
+                Lng                  = lng,
+                DateTime             = tarItem.UpdateTime.ToString("mmss"),
+                Distance             = tar.Distance.ToString(),
+                AzimuthAngle         = tar.AzimuthAngle.ToString(),
+                NorthDeviationAngle  = radar.NorthDeviationAngle,
+                RadarIp              = radar.Ip,
+                AxesX                = tar.AxesX,
+                AxesY                = tar.AxesY,
+                AreaId               = areaId
+            };
+            Worker.AddTarget(sms);
+
+            // TrackInfo → RadarDataChannelService (轨迹写入数据库)
+            var trackInfo = new TrackInfo
+            {
+                AlarmId    = alarmId,
+                UpdateTime = tarItem.UpdateTime,
+                Lat        = lat,
+                Lng        = lng,
+                TargetId   = tarItem.TargetId,
+                X          = tar.X,
+                Y          = tar.Y,
+                RadarIp    = radar.Ip,
+                AreaId     = areaId,
+                UpTime     = utime
+            };
+
+            if (RadarDataChannelService.Instance != null)
+            {
+                RadarDataChannelService.Instance.Write(trackInfo);
+            }
+            else
+            {
+                Console.WriteLine("RadarDataChannelService 未初始化");
+            }
+
+            // AlarmEvent → AlarmBackgroundService (报警队列)
+            if (AlarmBackgroundService.Instance != null)
+            {
+                var alarmEvent = new AlarmEvent
+                {
+                    ZoneId    = tarItem.DefenceId.ToString(),
+                    AlarmTime = now,
+                    TargetId  = tarItem.TargetId,
+                    RadarIp   = radar.Ip
+                };
+                AlarmBackgroundService.Instance.Write(alarmEvent);
+            }
+            else
+            {
+                Console.WriteLine("AlarmBackgroundService 未初始化");
+            }
+
+            return sms;
         }
 
     }

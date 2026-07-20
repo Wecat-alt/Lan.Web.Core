@@ -4,10 +4,12 @@ using Lan.Infrastructure;
 using Lan.Model;
 using Lan.Repository;
 using Lan.ServiceCore.IService;
+using Lan.ServiceCore.IService.Base;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services.Base;
 using Lan.ServiceCore.TargetCollection;
 using Lan.ServiceCore.WebScoket;
+using Microsoft.Extensions.DependencyInjection;
 using Model;
 using NetTopologySuite.Index.HPRtree;
 using SqlSugar;
@@ -21,6 +23,17 @@ namespace Lan.ServiceCore.Services
     [AppService(ServiceType = typeof(IRadarService), ServiceLifetime = LifeTime.Singleton)]
     public class RadarService : Repository<RadarModel>, IRadarService
     {
+        private readonly IServiceProvider _serviceProvider;
+        private readonly RadarClientManager _clientManager;
+        private IBaseService? _baseServiceLazy;
+        private IBaseService BaseService => _baseServiceLazy ??= _serviceProvider.GetRequiredService<IBaseService>();
+
+        public RadarService(IServiceProvider serviceProvider = null, RadarClientManager clientManager = null)
+        {
+            _serviceProvider = serviceProvider;
+            _clientManager = clientManager;
+        }
+
         public List<RadarModel> GetList(RadarQueryDto parm)
         {
             var predicate = QueryExp(parm);
@@ -54,11 +67,17 @@ namespace Lan.ServiceCore.Services
                     CameraURL = d.CameraURL,
                 })
                 .ToList();
-            var radarManager = RadarManager.GetInstance();
             foreach (var radar in response)
             {
-                var radarStatus = radarManager[radar.Ip];
-                radar.Online = radarStatus?.Online ?? false;
+                // 通过新 SDK RadarClientManager 查询在线状态（基于 0x0A→0xA2 应答）
+                radar.Online = _clientManager?.IsOnline(radar.Ip) ?? false;
+
+                // 从雷达状态响应中获取硬件型号名称（如 NSR100W、SUC261）
+                var model = _clientManager?.GetRadarModel(radar.Ip);
+                if (!string.IsNullOrEmpty(model) && string.IsNullOrEmpty(radar.RadarType))
+                {
+                    radar.RadarType = model;
+                }
             }
             return response;
         }

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.9.34622.214
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.11925.98 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lan.Application", "Lan.Application\Lan.Application.csproj", "{2DB31C52-6639-462C-BCE2-5CC774C4B705}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -23,9 +23,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lan.ServiceCore", "Lan.Serv
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "即时通讯层", "即时通讯层", "{6116F5E0-9357-491D-8E7C-E00FE0BE36CB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lan.NsrRadarSdk", "Lan.NsrRadarSdk\Lan.NsrRadarSdk.csproj", "{FBA9918E-9522-4FE4-8538-3D088317053D}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lan.Model", "Lan.Model\Lan.Model.csproj", "{FE0E10D3-0499-4778-913D-85265BDF15FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lan.RadarSdk.Core", "Lan.RadarSdk.Core\Lan.RadarSdk.Core.csproj", "{711751BA-13BF-41DE-A1C9-39EBDB5C3670}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,20 +49,20 @@ Global
 		{2E436FBE-7098-46E9-82D5-A11562859381}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2E436FBE-7098-46E9-82D5-A11562859381}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2E436FBE-7098-46E9-82D5-A11562859381}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FBA9918E-9522-4FE4-8538-3D088317053D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FBA9918E-9522-4FE4-8538-3D088317053D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FBA9918E-9522-4FE4-8538-3D088317053D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FBA9918E-9522-4FE4-8538-3D088317053D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{FE0E10D3-0499-4778-913D-85265BDF15FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{FE0E10D3-0499-4778-913D-85265BDF15FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE0E10D3-0499-4778-913D-85265BDF15FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FE0E10D3-0499-4778-913D-85265BDF15FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{711751BA-13BF-41DE-A1C9-39EBDB5C3670}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{711751BA-13BF-41DE-A1C9-39EBDB5C3670}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{711751BA-13BF-41DE-A1C9-39EBDB5C3670}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{711751BA-13BF-41DE-A1C9-39EBDB5C3670}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{FBA9918E-9522-4FE4-8538-3D088317053D} = {6116F5E0-9357-491D-8E7C-E00FE0BE36CB}
+		{711751BA-13BF-41DE-A1C9-39EBDB5C3670} = {6116F5E0-9357-491D-8E7C-E00FE0BE36CB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {770F0F04-5D8E-43B7-8F5D-D58AFE5EF35C}

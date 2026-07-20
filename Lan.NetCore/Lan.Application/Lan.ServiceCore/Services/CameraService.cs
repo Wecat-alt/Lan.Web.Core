@@ -1,9 +1,12 @@
 using Lan.Infrastructure.CameraOnvif;
 using Lan.ServiceCore.IService;
+using Lan.ServiceCore.IService.Base;
+using Lan.ServiceCore.Onvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services.Base;
 using Lan.ServiceCore.TargetCollection;
 using MemoryCache.Core;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 
 namespace Lan.ServiceCore.Services
@@ -13,9 +16,14 @@ namespace Lan.ServiceCore.Services
     {
         ONVIF_COMMON_INFO common = new ONVIF_COMMON_INFO();
         private readonly IMemoryCacheService? _cache;
-        public CameraService(IMemoryCacheService? cache = null)
+        private readonly IServiceProvider _serviceProvider;
+        private IBaseService? _baseServiceLazy;
+        private IBaseService BaseService => _baseServiceLazy ??= _serviceProvider.GetRequiredService<IBaseService>();
+
+        public CameraService(IMemoryCacheService? cache = null, IServiceProvider serviceProvider = null)
         {
             _cache = cache;
+            _serviceProvider = serviceProvider;
         }
 
         public List<CameraModel> GetList(CameraQueryDto parm)
@@ -32,7 +40,7 @@ namespace Lan.ServiceCore.Services
             foreach (var camera in response)
             {
                 //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(camera.Ip);
-                common = _cache.Get<ONVIF_COMMON_INFO>(camera.Ip);
+                common = OnvifCacheHelper.GetOrRefresh(camera.Ip, _cache);
                 ONVIF_DEVICE_INFO oNVIF_DEVICE_INFO = new ONVIF_DEVICE_INFO();
                 int ret = onvifsdk.ONVIF_MAGEMENT_GetDeviceInformation(10, ref common, ref oNVIF_DEVICE_INFO);
                 if (ret == 0)
@@ -229,8 +237,10 @@ namespace Lan.ServiceCore.Services
         public void GetMinZoomPT(int Id, string Ip)
         {
             //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(Ip);
-            common = _cache.Get<ONVIF_COMMON_INFO>(Ip);
+            common = OnvifCacheHelper.GetOrRefresh(Ip, _cache);
             ONVIF_PTZ_STATUS aa = new ONVIF_PTZ_STATUS();
+            if (string.IsNullOrEmpty(common.username))
+                return;
             int ret = onvifsdk.ONVIF_PTZ_GetStatus(2, ref common, ref aa);
 
             int i = UpdateSql($"UPDATE camera SET minZoomPan = {aa.panPosition},minZoomTilt = {aa.tiltPosition} WHERE ID = '{Id}'");
@@ -242,8 +252,10 @@ namespace Lan.ServiceCore.Services
         public void GetMaxZoomPT(int Id, string Ip)
         {
             //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(Ip);
-            common = _cache.Get<ONVIF_COMMON_INFO>(Ip);
+            common = OnvifCacheHelper.GetOrRefresh(Ip, _cache);
             ONVIF_PTZ_STATUS aa = new ONVIF_PTZ_STATUS();
+            if (string.IsNullOrEmpty(common.username))
+                return;
             int ret = onvifsdk.ONVIF_PTZ_GetStatus(2, ref common, ref aa);
 
 

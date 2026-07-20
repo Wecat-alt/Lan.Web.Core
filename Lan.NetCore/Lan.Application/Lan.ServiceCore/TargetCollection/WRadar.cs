@@ -1,5 +1,4 @@
-﻿using CAT.NsrRadarSdk;
-using CAT.NsrRadarSdk.NsrTypes;
+﻿using Lan.ServiceCore.TargetCollection;
 using Model;
 using System.Drawing;
 using System.Net;
@@ -11,7 +10,6 @@ namespace Lan.ServiceCore.WebScoket
 
 
         #region 成员变量
-        NsrRadar _NsrRadar;
 
         int _nID;
         int _nDefenceAreaId;
@@ -35,7 +33,6 @@ namespace Lan.ServiceCore.WebScoket
         RVS_Target_List _RadarTargets;
         object _lockTargets;
         bool _bDefenceEnable;
-        AutoResetEvent _evtReceivedReply;
 
         string _Latitude;
         string _Longitude;
@@ -48,11 +45,6 @@ namespace Lan.ServiceCore.WebScoket
         #region 属性
 
 
-        public NsrRadar C_NsrRadar
-        {
-            get { return _NsrRadar; }
-            set { _NsrRadar = value; }
-        }
         public int ID
         {
             get { return _nID; }
@@ -142,28 +134,8 @@ namespace Lan.ServiceCore.WebScoket
 
         public bool Online
         {
-            get
-            {
-                if (_NsrRadar != null)
-                {
-                    return _NsrRadar.Online;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            set
-            {
-                if (_NsrRadar != null)
-                {
-                    _bOnline = _NsrRadar.Online;
-                }
-                else
-                {
-                    _bOnline = false;
-                }
-            }
+            get { return _bOnline; }
+            set { _bOnline = value; }
         }
 
         /// <summary>
@@ -374,7 +346,6 @@ namespace Lan.ServiceCore.WebScoket
             _lockTargets = new object();
             _RadarTargets = null;
             _devAddr = RVS_DeviceAddress.Unknown;
-            _evtReceivedReply = new AutoResetEvent(false);
             _fTopMountingYOffset = -1;
 
             _Latitude = "0";
@@ -459,56 +430,6 @@ namespace Lan.ServiceCore.WebScoket
 
         #endregion
 
-
-        #region 通信协议封装
-        public bool NetSet(IPAddress ip, IPAddress netmask, IPAddress gateway)
-        {
-
-            return _NsrRadar.SetIpAddress(ip, netmask, gateway);
-        }
-
-
-
-        public bool ReadStatus(ref rvs_PARAM_STATUS frame)
-        {
-            bool result = _NsrRadar.GetStatus(ref frame);
-
-            if (result)
-            {
-                //if (ReceivedFrame is rvs_PARAM_STATUS)
-                //{
-                // frame = (rvs_PARAM_STATUS)ReceivedFrame;
-                _nHeartTime = frame.heart.time;
-                PointF[] pts = new PointF[frame.position.Length];
-                int flag = 0;
-                for (int i = 0; i < pts.Length; i++)
-                {
-                    float x = frame.position[i].X;
-                    float y = frame.position[i].Y;
-                    int index = frame.position[i].coordinateNo - 1;
-                    if (index >= 0 && index < pts.Length)
-                    {
-                        pts[index] = new PointF(x, y);
-                        flag |= (1 << index);
-                    }
-                }
-                if (pts.Length == 4 && flag == 0x0F)
-                    _ptsAlarmAreaVertices = pts;
-
-                AlgorithmVersion = frame.radarVerInfo.AlgorithmVersion;
-                FirmwareVersion = frame.radarVerInfo.FirmwareVersion;
-
-                SaveToDatabase();
-                //}
-                //else
-                //    result = false;
-            }
-            return result;
-        }
-
-
-
-        #endregion
 
         #region 雷达功能实现
 

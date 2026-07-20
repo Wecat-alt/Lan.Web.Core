@@ -1,5 +1,4 @@
-﻿using CAT.NsrRadarSdk.NsrTypes;
-using Lan.ServiceCore.WebScoket;
+﻿using Lan.ServiceCore.WebScoket;
 using System.Drawing;
 
 namespace Lan.ServiceCore.TargetCollection

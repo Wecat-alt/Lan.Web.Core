@@ -15,7 +15,7 @@ const LOCAL_AUTH_PRESETS = {
       'camera:add',
       'defencearea:edit',
     ],
-    menus: ['realtime_map', 'alarm', 'livePreview', 'camera', 'radar'],
+    menus: ['realtime_map', 'alarm', 'livePreview', 'camera', 'radar', 'radar3d'],
   },
   guest: {
     roles: ['guest'],

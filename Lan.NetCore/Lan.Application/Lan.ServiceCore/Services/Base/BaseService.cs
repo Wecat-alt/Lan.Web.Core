@@ -21,20 +21,28 @@ using System.Threading.Tasks;
 
 namespace Lan.ServiceCore.Services.Base
 {
-    [AppService(ServiceType = typeof(IBaseService), ServiceLifetime = LifeTime.Transient)]
+    [AppService(ServiceType = typeof(IBaseService), ServiceLifetime = LifeTime.Singleton)]
     public class BaseService : IBaseService
     {
-        public static void LoadCalibration()
+        private readonly ICameraService _cameraService;
+        private readonly IRadarService _radarService;
+        private readonly IDefenceareaService _defenceareaService;
+
+        public BaseService(ICameraService cameraService, IRadarService radarService, IDefenceareaService defenceareaService)
+        {
+            _cameraService = cameraService;
+            _radarService = radarService;
+            _defenceareaService = defenceareaService;
+        }
+
+        public void LoadCalibration()
         {
             RBTRACKManage.Init();
         }
 
-        public static void LoadDefenceAreaAdd(int id)
+        public void LoadDefenceAreaAdd(int id)
         {
-            CameraService cameraService = new CameraService();
-            RadarService radarService = new RadarService();
-            DefenceareaService defenceareaService = new DefenceareaService(radarService, cameraService);
-            DefenceareaModel defenceareaModel = defenceareaService.GetInfo(id);
+            DefenceareaModel defenceareaModel = _defenceareaService.GetInfo(id);
 
             //添加防区
 
@@ -43,7 +51,7 @@ namespace Lan.ServiceCore.Services.Base
             WDefenceArea _defenceArea = DefenceAreaManager.GetInstance()[id];
 
 
-            List<CameraModel> Cameras = cameraService.SelectCameraIds(id);
+            List<CameraModel> Cameras = _cameraService.SelectCameraIds(id);
 
             if (Cameras.Count > 0)
             {
@@ -52,7 +60,7 @@ namespace Lan.ServiceCore.Services.Base
             }
 
 
-            List<RadarModel> Radars = radarService.SelectRadarIds(id);
+            List<RadarModel> Radars = _radarService.SelectRadarIds(id);
             if (Radars.Count > 0)
             {
                 WRadar _WRadar = RadarManager.GetInstance()[Radars[0].Ip];
@@ -61,10 +69,8 @@ namespace Lan.ServiceCore.Services.Base
 
         }
 
-        public static void LoadDefenceAreaUpdate(DefenceareaModel model)
+        public void LoadDefenceAreaUpdate(DefenceareaModel model)
         {
-            CameraService cameraService = new CameraService();
-            RadarService radarService = new RadarService();
 
             //修改防区
             int _id = model.Id;
@@ -88,7 +94,7 @@ namespace Lan.ServiceCore.Services.Base
             //取消雷达绑定
             if (model.RadarIds?.Length > 0)
             {
-                RadarModel radarModel = radarService.GetInfo(model.RadarIds[0]);
+                RadarModel radarModel = _radarService.GetInfo(model.RadarIds[0]);
                 WRadar _WRadar = RadarManager.GetInstance()[radarModel.Ip];
                 defenceArea.BindRadarRange(_WRadar);
             }
@@ -97,7 +103,7 @@ namespace Lan.ServiceCore.Services.Base
                 //如果全部清空，就要清除绑定雷达
                 foreach (var item in defenceArea.Radars)
                 {
-                    RadarModel radarModel = radarService.GetInfo(item.ID);
+                    RadarModel radarModel = _radarService.GetInfo(item.ID);
                     WRadar _WRadar = RadarManager.GetInstance()[radarModel.Ip];
                     _WRadar.BindToDefenceArea(-1);
                 }
@@ -107,7 +113,7 @@ namespace Lan.ServiceCore.Services.Base
 
             if (model.CameraIds?.Length > 0)
             {
-                CameraModel cameraModel = cameraService.GetInfo(model.CameraIds[0]);
+                CameraModel cameraModel = _cameraService.GetInfo(model.CameraIds[0]);
                 WCamera cb = CameraManager.GetInstance()[cameraModel.Ip];
                 defenceArea.BindCamera(cb);
             }
@@ -117,7 +123,7 @@ namespace Lan.ServiceCore.Services.Base
                 {
                     foreach (var item in defenceArea.Cameras)
                     {
-                        CameraModel cameraModel = cameraService.GetInfo(item.ID);
+                        CameraModel cameraModel = _cameraService.GetInfo(item.ID);
                         WCamera cb = CameraManager.GetInstance()[cameraModel.Ip];
                         cb.UnBindToDefenceArea();
                     }
@@ -128,7 +134,7 @@ namespace Lan.ServiceCore.Services.Base
             RBTRACKManage.Init();
 
         }
-        public static void LoadDefenceAreaUpdate(int status)
+        public void LoadDefenceAreaUpdate(int status)
         {
             bool _den;
             if (status == 1)
@@ -141,20 +147,19 @@ namespace Lan.ServiceCore.Services.Base
                 defence.DefenceEnable = _den;
             }
         }
-        public static void LoadDefenceAreaDelete(int _id)
+        public void LoadDefenceAreaDelete(int _id)
         {
             DefenceAreaManager.GetInstance().Delete(_id);
         }
 
-        public static void LoadRadarAdd(int id)
+        public void LoadRadarAdd(int id)
         {
-            RadarService radarService = new RadarService();
-            var radarModel = radarService.GetInfo(id);
+            var radarModel = _radarService.GetInfo(id);
             //雷达添加
             RadarManager.GetInstance().Add(radarModel);
         }
 
-        public static void LoadDeleteRadar(string ip)
+        public void LoadDeleteRadar(string ip)
         {
             //删除雷达
             string _ip = ip;
@@ -164,22 +169,20 @@ namespace Lan.ServiceCore.Services.Base
 
         }
 
-        public static void LoadCameraAdd(int _id)
+        public void LoadCameraAdd(int _id)
         {
-            CameraService cameraService = new CameraService();
-            var CameraList = cameraService.GetInfo(_id);
+            var CameraList = _cameraService.GetInfo(_id);
 
             //相机添加
             WCamera camera = new WCamera(CameraList);
             CameraManager.GetInstance().Add(camera);
         }
 
-        public static void LoadCameraUpdate(int _id)
+        public void LoadCameraUpdate(int _id)
         {
             GlobalVariable.TrackStatus = false;
             //修改相机
-            CameraService cameraService = new CameraService();
-            var CameraList = cameraService.GetInfo(_id);
+            var CameraList = _cameraService.GetInfo(_id);
 
             WCamera _camera = CameraManager.GetInstance()[_id];
             _camera.Name = CameraList.Name;
@@ -231,7 +234,7 @@ namespace Lan.ServiceCore.Services.Base
 
         }
 
-        public static void LoadUnBindCamera(string ip)
+        public void LoadUnBindCamera(string ip)
         {
 
             string _ip = ip;
@@ -253,7 +256,7 @@ namespace Lan.ServiceCore.Services.Base
             CameraManager.GetInstance().Remove(cb);
 
         }
-        public static void LoadUnBindCamera(string status, string ip)
+        public void LoadUnBindCamera(string status, string ip)
         {
             if (status == "15")
             {

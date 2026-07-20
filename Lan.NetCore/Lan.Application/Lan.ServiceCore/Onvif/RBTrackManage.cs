@@ -1,6 +1,7 @@
 ﻿
 using Infrastructure;
 using Lan.Infrastructure.CameraOnvif;
+using Lan.ServiceCore.IService;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services;
 using Lan.ServiceCore.Signalr;
@@ -23,8 +24,6 @@ namespace Lan.ServiceCore.Onvif
     {
         public static List<RBTRACK_Info> list_RBTRACK = new List<RBTRACK_Info>();
 
-        static CameraService cameraService = new CameraService();
-        CalibrationService calibrationService = new CalibrationService();
         private static RBTrackSdk.TrackCallBack _TrackCallBack;
 
         private static readonly IMemoryCacheService? _cache = App.GetService<IMemoryCacheService>();
@@ -56,7 +55,7 @@ namespace Lan.ServiceCore.Onvif
                 }
                 _cache.Remove("RBTrack");
             }
-            List<CameraModel> cameraBuffers = cameraService.GetAllList();
+            List<CameraModel> cameraBuffers = App.GetService<ICameraService>().GetAllList();
 
 
             if (cameraBuffers != null)
@@ -102,9 +101,7 @@ namespace Lan.ServiceCore.Onvif
                         ////防区雷达=相机绑定雷达
                         int cameraid = item.CameraId;
 
-                        CalibrationService calibrationService = new CalibrationService();
-
-                        Calibration calibration = calibrationService.GetInfo(item.Ip, item.BindingAreaId);
+                        Calibration calibration = App.GetService<ICalibrationService>().GetInfo(item.Ip, item.BindingAreaId);
 
                         if (calibration != null)
                         {

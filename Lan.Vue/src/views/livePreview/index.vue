@@ -369,7 +369,7 @@ const trackTarget = (targetId) => {
 function normalizeCamera(item = {}, idx = 0) {
   return {
     id: item.id ?? item.cameraId ?? item.pid ?? idx + 1,
-    zoneName: `${t('livePreview.zone')}: ${item.zoneName}`,
+    zoneName: item.zoneName ? `${t('livePreview.zone')}: ${item.zoneName}` : t('livePreview.zone'),
     ip: item.ip,
     username: item.username,
     password: item.password,

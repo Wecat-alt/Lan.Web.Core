@@ -45,7 +45,7 @@ namespace Infrastructure
         /// 获取请求生命周期的服务
         /// </summary>
         /// <typeparam name="TService"></typeparam>
-        /// <returns></returns>
+        /// <returns></returns>0
         public static TService GetService<TService>()
             where TService : class
         {

@@ -2,6 +2,7 @@ using Infrastructure;
 using Lan.Infrastructure.CameraOnvif;
 using Lan.Repository;
 using Lan.ServiceCore.IService;
+using Lan.ServiceCore.IService.Base;
 using Lan.ServiceCore.Onvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services.Base;
@@ -18,9 +19,11 @@ namespace Lan.ServiceCore.Services
     {
         ONVIF_COMMON_INFO common = new ONVIF_COMMON_INFO();
         private readonly IMemoryCacheService? _cache;
-        public CalibrationService(IMemoryCacheService? cache = null)
+        private readonly IBaseService _baseService;
+        public CalibrationService(IMemoryCacheService? cache = null, IBaseService baseService = null)
         {
             _cache = cache;
+            _baseService = baseService;
         }
 
 
@@ -30,7 +33,9 @@ namespace Lan.ServiceCore.Services
             Queryable().Where(f => f.CameraIp == model.CameraIp && f.DefenceareaId == model.DefenceareaId).ToList().ForEach(item => { Delete(item.Id); });
 
             //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(model.CameraIp);
-            common = _cache.Get<ONVIF_COMMON_INFO>(model.CameraIp);
+            common = OnvifCacheHelper.GetOrRefresh(model.CameraIp, _cache);
+            if (string.IsNullOrEmpty(common.username))
+                return "ONVIF cache miss, cannot get camera PTZ status";
 
             ONVIF_PTZ_STATUS panPost = new ONVIF_PTZ_STATUS();
             int ret = onvifsdk.ONVIF_PTZ_GetStatus(2, ref common, ref panPost);
@@ -38,7 +43,7 @@ namespace Lan.ServiceCore.Services
             model.CamerarPointAngle = panPost.panPosition;
             Insertable(model).ExecuteReturnEntity();
 
-            BaseService.LoadCalibration();
+            _baseService.LoadCalibration();
             return $"Point:{model.CamerarPointAngle:F2}";
         }
 
@@ -56,7 +61,9 @@ namespace Lan.ServiceCore.Services
 
 
             //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(ip);
-            common = _cache.Get<ONVIF_COMMON_INFO>(ip);
+            common = OnvifCacheHelper.GetOrRefresh(ip, _cache);
+            if (string.IsNullOrEmpty(common.username))
+                return;
             float onvif_speed = float.Parse(speed, CultureInfo.InvariantCulture);
             switch (_CameraPTZ)
             {
@@ -120,7 +127,9 @@ namespace Lan.ServiceCore.Services
         {
             ONVIF_PTZ_CONTINUSMOVE ONVIF_PTZ_CONTINUSMOVE = new ONVIF_PTZ_CONTINUSMOVE();
             //common = MemoryCacheHelper.Get<ONVIF_COMMON_INFO>(ip);
-            common = _cache.Get<ONVIF_COMMON_INFO>(ip);
+            common = OnvifCacheHelper.GetOrRefresh(ip, _cache);
+            if (string.IsNullOrEmpty(common.username))
+                return;
             onvifsdk.ONVIF_PTZ_ContinusStop(2, ref common);
         }
 
@@ -130,7 +139,7 @@ namespace Lan.ServiceCore.Services
         {
             GlobalVariable.TrackStatus = false;
             int i = UpdateSql($"UPDATE calibration SET CalibrationDistance = {CalibrationDistance},CameraPointX={CameraPointX},CameraPointY={CameraPointY},CamerarPointAngle={CamerarPointAngle} WHERE CameraIp = '{CameraIp}' and DefenceareaId='{DefenceareaId}'");
-            BaseService.LoadCalibration();
+            _baseService.LoadCalibration();
             GlobalVariable.TrackStatus = true;
             return i;
         }

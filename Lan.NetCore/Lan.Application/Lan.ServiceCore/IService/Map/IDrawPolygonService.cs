@@ -16,5 +16,6 @@ namespace Lan.ServiceCore.IService
         int UpdateDrawPolygon(DrawPolygon parm);
         int DeleteDrawPolygon(string pointListLatLng);
         List<DrawPolygon> GetAllList();
+        List<DrawPolygon> GetDrawPolygonByDefenceAreaId(int defenceAreaId, int pointType);
     }
 }
