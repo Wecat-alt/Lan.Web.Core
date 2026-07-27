@@ -11,12 +11,10 @@ namespace Lan.Application.Controllers.Base
     public class ConfigJsUpdaterController : BaseController
     {
         private readonly ConfigJsUpdater _configJsUpdater;
-        private readonly IWebHostEnvironment _env;
 
-        public ConfigJsUpdaterController(ConfigJsUpdater configJsUpdater, IWebHostEnvironment env)
+        public ConfigJsUpdaterController(ConfigJsUpdater configJsUpdater)
         {
             _configJsUpdater = configJsUpdater;
-            _env = env;
         }
 
         /// <summary>
@@ -35,11 +33,11 @@ namespace Lan.Application.Controllers.Base
             results.Add(_configJsUpdater.UpdateConfigJs(ip!));
 
             // 2. 更新 appsettings.json 中的 CorsUrls
-            var appSettingsPath = Path.Combine(_env.ContentRootPath, "appsettings.json");
+            var appSettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             results.Add(_configJsUpdater.UpdateAppSettings(ip!, appSettingsPath));
 
             // 3. 回收应用池使 CORS 配置生效
-            var webConfigPath = Path.Combine(_env.ContentRootPath, "web.config");
+            var webConfigPath = Path.Combine(AppContext.BaseDirectory, "web.config");
             results.Add(_configJsUpdater.RecycleAppPool(webConfigPath));
 
             return Message(string.Join(" | ", results));

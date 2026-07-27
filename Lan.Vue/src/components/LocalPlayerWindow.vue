@@ -84,9 +84,9 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'closed'])
 
-const HEADER_HEIGHT = 42
-const SHELL_PADDING = 14
-const BODY_TOP_GAP = 10
+const HEADER_HEIGHT = 32
+const SHELL_PADDING = 6
+const BODY_TOP_GAP = 2
 const MIN_CONTENT_WIDTH = 320
 const MIN_CONTENT_HEIGHT = 220
 const VIEWPORT_GAP = 0
@@ -497,63 +497,56 @@ onBeforeUnmount(async () => {
 .local-player-mask {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at top right, rgba(64, 158, 255, 0.08), transparent 30%);
+  background: radial-gradient(ellipse at top right, rgba(64, 158, 255, 0.05), transparent 65%);
   pointer-events: none;
   z-index: 3000;
 }
 
 .local-player-window {
   position: fixed;
-  background: linear-gradient(180deg, rgba(16, 28, 45, 0.96) 0%, rgba(10, 20, 35, 0.94) 100%);
-  border: 1px solid rgba(64, 158, 255, 0.32);
-  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(14, 24, 40, 0.97) 0%, rgba(9, 18, 33, 0.96) 100%);
+  border: 1px solid rgba(64, 158, 255, 0.18);
+  border-radius: 12px;
   box-shadow:
-    0 20px 50px rgba(5, 16, 30, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 0 1px rgba(17, 87, 160, 0.08);
-  backdrop-filter: blur(10px);
+    0 4px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(64, 158, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
   overflow: visible;
   pointer-events: auto;
   user-select: none;
-  transition:
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .local-player-window:hover {
-  border-color: rgba(64, 158, 255, 0.46);
+  border-color: rgba(64, 158, 255, 0.28);
   box-shadow:
-    0 24px 56px rgba(5, 16, 30, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 1px rgba(64, 158, 255, 0.12);
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 60px rgba(64, 158, 255, 0.08),
+    0 0 0 1px rgba(64, 158, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+/* ── Header ── */
 .local-player-header {
-  height: 42px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px 0 14px;
-  color: #eaf3ff;
-  background: linear-gradient(
-    90deg,
-    rgba(46, 124, 214, 0.9) 0%,
-    rgba(28, 89, 165, 0.88) 52%,
-    rgba(18, 56, 107, 0.9) 100%
-  );
-  border-bottom: 1px solid rgba(160, 212, 255, 0.18);
-  border-radius: 14px 14px 0 0;
-  box-shadow: inset 0 -1px 0 rgba(6, 29, 58, 0.35);
+  padding: 0 10px 0 14px;
+  background: linear-gradient(135deg, rgba(25, 90, 185, 0.92) 0%, rgba(16, 55, 125, 0.95) 100%);
+  border-bottom: 1px solid rgba(140, 200, 255, 0.15);
   cursor: move;
 }
 
 .local-player-title {
   position: relative;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.4px;
-  padding-left: 12px;
-  text-shadow: 0 1px 2px rgba(7, 25, 48, 0.25);
+  letter-spacing: 0.3px;
+  color: #e8f2ff;
+  padding-left: 14px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .local-player-title::before {
@@ -561,47 +554,51 @@ onBeforeUnmount(async () => {
   position: absolute;
   left: 0;
   top: 50%;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #d8ecff;
-  box-shadow: 0 0 10px rgba(216, 236, 255, 0.9);
+  background: #6dd4a8;
+  box-shadow: 0 0 8px rgba(109, 212, 168, 0.7);
   transform: translateY(-50%);
+  animation: player-pulse 2s ease-in-out infinite;
+}
+
+@keyframes player-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(109, 212, 168, 0.7); }
+  50% { opacity: 0.55; box-shadow: 0 0 3px rgba(109, 212, 168, 0.3); }
 }
 
 .local-player-close {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: none;
-
-  color: #f6fbff;
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
+  border-radius: 50%;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: all 0.22s ease;
 }
 
 .local-player-close:hover {
-  background: linear-gradient(180deg, rgba(255, 113, 113, 0.96) 0%, rgba(235, 87, 87, 0.96) 100%);
-  box-shadow: 0 8px 16px rgba(189, 66, 66, 0.28);
-  transform: translateY(-1px);
+  background: rgba(245, 80, 80, 0.88);
+  color: #fff;
+  transform: rotate(90deg);
+  box-shadow: 0 4px 14px rgba(200, 60, 60, 0.35);
 }
 
 .local-player-close:focus-visible {
-  outline: 2px solid rgba(220, 238, 255, 0.85);
+  outline: 2px solid rgba(180, 220, 255, 0.9);
   outline-offset: 1px;
 }
 
+/* ── Resize Handles ── */
 .resize-handle {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
 }
 
 .resize-handle-top,
@@ -611,15 +608,8 @@ onBeforeUnmount(async () => {
   height: 10px;
 }
 
-.resize-handle-top {
-  top: -5px;
-  cursor: ns-resize;
-}
-
-.resize-handle-bottom {
-  bottom: -5px;
-  cursor: ns-resize;
-}
+.resize-handle-top { top: -5px; cursor: ns-resize; }
+.resize-handle-bottom { bottom: -5px; cursor: ns-resize; }
 
 .resize-handle-left,
 .resize-handle-right {
@@ -628,45 +618,46 @@ onBeforeUnmount(async () => {
   width: 10px;
 }
 
+.resize-handle-left { left: -5px; cursor: ew-resize; }
+.resize-handle-right { right: -5px; cursor: ew-resize; }
+
 .resize-handle-top-left,
 .resize-handle-top-right,
 .resize-handle-bottom-left,
 .resize-handle-bottom-right {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  z-index: 4;
 }
 
-.resize-handle-left {
-  left: -5px;
-  cursor: ew-resize;
+.resize-handle-top-left { top: -7px; left: -7px; cursor: nwse-resize; }
+.resize-handle-top-right { top: -7px; right: -7px; cursor: nesw-resize; }
+.resize-handle-bottom-left { bottom: -7px; left: -7px; cursor: nesw-resize; }
+.resize-handle-bottom-right { bottom: -7px; right: -7px; cursor: nwse-resize; }
+
+/* 四角可见拖拽指示块 */
+.resize-handle-top-left::after,
+.resize-handle-top-right::after,
+.resize-handle-bottom-left::after,
+.resize-handle-bottom-right::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: rgba(64, 158, 255, 0.35);
+  transition: background 0.2s ease;
 }
 
-.resize-handle-right {
-  right: -5px;
-  cursor: ew-resize;
-}
+.resize-handle-top-left::after { bottom: 2px; right: 2px; }
+.resize-handle-top-right::after { bottom: 2px; left: 2px; }
+.resize-handle-bottom-left::after { top: 2px; right: 2px; }
+.resize-handle-bottom-right::after { top: 2px; left: 2px; }
 
-.resize-handle-top-left {
-  top: -6px;
-  left: -6px;
-  cursor: nwse-resize;
-}
-
-.resize-handle-top-right {
-  top: -6px;
-  right: -6px;
-  cursor: nesw-resize;
-}
-
-.resize-handle-bottom-left {
-  bottom: -6px;
-  left: -6px;
-  cursor: nesw-resize;
-}
-
-.resize-handle-bottom-right {
-  bottom: -6px;
-  right: -6px;
-  cursor: nwse-resize;
+.local-player-window:hover .resize-handle-top-left::after,
+.local-player-window:hover .resize-handle-top-right::after,
+.local-player-window:hover .resize-handle-bottom-left::after,
+.local-player-window:hover .resize-handle-bottom-right::after {
+  background: rgba(64, 158, 255, 0.6);
 }
 </style>

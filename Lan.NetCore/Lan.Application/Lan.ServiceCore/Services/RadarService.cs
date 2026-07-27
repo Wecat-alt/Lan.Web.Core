@@ -74,7 +74,7 @@ namespace Lan.ServiceCore.Services
 
                 // 从雷达状态响应中获取硬件型号名称（如 NSR100W、SUC261）
                 var model = _clientManager?.GetRadarModel(radar.Ip);
-                if (!string.IsNullOrEmpty(model) && string.IsNullOrEmpty(radar.RadarType))
+                if (!string.IsNullOrEmpty(model) && string.IsNullOrWhiteSpace(radar.RadarType))
                 {
                     radar.RadarType = model;
                 }
@@ -133,6 +133,14 @@ namespace Lan.ServiceCore.Services
             GlobalVariable.TrackStatus = false;
             var res = Insertable(model).ExecuteReturnEntity();
             BaseService.LoadRadarAdd(res.Id);
+
+            // 新增雷达后启动 TCP 连接（仅 Status == 1 启用状态）
+            if (res.Status == 1)
+            {
+                var port = res.Port > 0 ? res.Port : 50000;
+                _clientManager?.StartClient(res.Ip, port);
+            }
+
             GlobalVariable.TrackStatus = true;
             return res;
         }
@@ -140,12 +148,30 @@ namespace Lan.ServiceCore.Services
         public int UpdateRadar(RadarModel model)
         {
             GlobalVariable.TrackStatus = false;
+
+            // 获取旧记录以判断 Status 是否变更
+            var oldRadar = GetInfo(model.Id);
+
             int i = Update(model, true);
 
             WRadar wRadar = RadarManager.GetInstance()[model.Ip];
             RadarManager.GetInstance().Remove(wRadar);
 
             RadarManager.GetInstance().Add(model);
+
+            // 根据 Status 变更处理 TCP 连接
+            if (oldRadar?.Status == 1 && model.Status != 1)
+            {
+                // 启用 → 禁用：断开 TCP 连接
+                _ = _clientManager?.StopClientAsync(model.Ip);
+            }
+            else if (oldRadar?.Status != 1 && model.Status == 1)
+            {
+                // 禁用 → 启用：启动 TCP 连接
+                var port = model.Port > 0 ? model.Port : 50000;
+                _clientManager?.StartClient(model.Ip, port);
+            }
+
             GlobalVariable.TrackStatus = true;
             return i;
         }
@@ -175,6 +201,9 @@ namespace Lan.ServiceCore.Services
             {
                 RadarModel radarModel = GetInfo(item);
                 BaseService.LoadDeleteRadar(radarModel.Ip);
+
+                // 删除雷达时断开 TCP 连接
+                _ = _clientManager?.StopClientAsync(radarModel.Ip);
             }
             int i = Delete(id);
             GlobalVariable.TrackStatus = true;

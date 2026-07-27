@@ -29,12 +29,12 @@
             </el-col>
             <el-col :lg="12">
               <el-form-item :label="$t('zone.latitude')">
-                <el-input v-model="form.latitude" placeholder="39.9042" />
+                <el-input v-model="form.latitude" placeholder="39.904200" @blur="form.latitude = formatDecimal(form.latitude)" />
               </el-form-item>
             </el-col>
             <el-col :lg="12">
               <el-form-item :label="$t('zone.longitude')">
-                <el-input v-model="form.longitude" placeholder="116.4074" />
+                <el-input v-model="form.longitude" placeholder="116.407400" @blur="form.longitude = formatDecimal(form.longitude)" />
               </el-form-item>
             </el-col>
             <el-col :lg="12">
@@ -149,17 +149,23 @@
         :show-overflow-tooltip="true"
       />
       <el-table-column
-        prop="latitude"
         :label="$t('zone.latitude')"
         align="center"
         :show-overflow-tooltip="true"
-      />
+      >
+        <template #default="scope">
+          {{ Number(scope.row.latitude).toFixed(6) }}
+        </template>
+      </el-table-column>
       <el-table-column
-        prop="longitude"
         :label="$t('zone.longitude')"
         align="center"
         :show-overflow-tooltip="true"
-      />
+      >
+        <template #default="scope">
+          {{ Number(scope.row.longitude).toFixed(6) }}
+        </template>
+      </el-table-column>
       <el-table-column :label="$t('zone.defenceEnable')" align="center" prop="defenceEnable">
         <template #default="scope">
           <el-tag :type="scope.row.defenceEnable === 1 ? 'success' : 'danger'">
@@ -221,12 +227,12 @@
 
           <el-col :lg="12">
             <el-form-item :label="$t('zone.latitude')" prop="latitude">
-              <el-input v-model="form.latitude" />
+              <el-input v-model="form.latitude" @blur="form.latitude = formatDecimal(form.latitude)" />
             </el-form-item>
           </el-col>
           <el-col :lg="12">
             <el-form-item :label="$t('zone.longitude')" prop="longitude">
-              <el-input v-model="form.longitude" />
+              <el-input v-model="form.longitude" @blur="form.longitude = formatDecimal(form.longitude)" />
             </el-form-item>
           </el-col>
 
@@ -304,6 +310,7 @@
 
 <script>
 import { getConfigKey } from '@/api/config/config'
+import { formatDecimal } from '@/utils/format'
 import {
   getCameraRepetitionJudgmentAdd,
   getCameraRepetitionJudgmentEdit,
@@ -431,8 +438,8 @@ export default {
         defenceEnable: 0,
         defenceEnableName: '撤防',
         defenceRadius: 50,
-        latitude: '0',
-        longitude: '0',
+        latitude: '0.000000',
+        longitude: '0.000000',
 
         cameraIds: [],
         radarIds: [],
@@ -464,11 +471,11 @@ export default {
           .map((item) => item.trim())
 
         if (latitude !== undefined && latitude !== '') {
-          this.form.latitude = latitude
+          this.form.latitude = this.formatDecimal(latitude)
         }
 
         if (longitude !== undefined && longitude !== '') {
-          this.form.longitude = longitude
+          this.form.longitude = this.formatDecimal(longitude)
         }
       })
     },
@@ -498,6 +505,9 @@ export default {
         this.form.radarIds = data.data.radarIds
         this.form.latitude = data.data.defencearea.latitude
         this.form.longitude = data.data.defencearea.longitude
+
+        this.form.latitude = this.formatDecimal(this.form.latitude)
+        this.form.longitude = this.formatDecimal(this.form.longitude)
 
         this.open = true
         this.title = this.$t('common.edit')
@@ -648,6 +658,7 @@ export default {
       try { localStorage.removeItem('wizard') } catch (e) {}
       try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' })) } catch (e) {}
     },
+    formatDecimal,
   },
 }
 </script>

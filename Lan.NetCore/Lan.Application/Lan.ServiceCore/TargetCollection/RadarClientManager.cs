@@ -352,10 +352,10 @@ public sealed class RadarClientManager : BackgroundService
                 var t = packet.Targets[i];
                 var dist = MathF.Sqrt(t.XAxis * t.XAxis + t.YAxis * t.YAxis);
                 _logger.LogInformation(
-                    "  [#{Idx}] Id={Id} Type={Type} X={X:F2} Y={Y:F2} Dist={Dist:F2}m " +
-                    "SpeedX={Sx:F2} SpeedY={Sy:F2} Azimuth={Az:F2}° SNR={Snr:F1}",
-                    i + 1, t.Id, t.Type, t.XAxis, t.YAxis, dist,
-                    t.XSpeed, t.YSpeed, t.AzimuthAngle, t.Snr);
+                    "  [#{Idx}] Id={Id} Type={Type} X={X:F2} Y={Y:F2} Z={Z:F2} Dist={Dist:F2}m " +
+                    "SpeedX={Sx:F2} SpeedY={Sy:F2} Azimuth={Az:F2}° Elevation={Elev:F2}° SNR={Snr:F1}",
+                    i + 1, t.Id, t.Type, t.XAxis, t.YAxis, t.ZAxis, dist,
+                    t.XSpeed, t.YSpeed, t.AzimuthAngle, t.ElevationAngle, t.Snr);
             }
 
             // 1. 从 RadarManager 获取对应 WRadar

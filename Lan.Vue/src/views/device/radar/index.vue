@@ -31,17 +31,17 @@
             </el-col>
             <el-col :lg="12">
               <el-form-item :label="$t('radar.latitude')" prop="latitude">
-                <el-input v-model="form.latitude" placeholder="39.9042" />
+                <el-input v-model="form.latitude" placeholder="39.904200" @blur="form.latitude = formatDecimal(form.latitude)" />
               </el-form-item>
             </el-col>
             <el-col :lg="12">
               <el-form-item :label="$t('radar.longitude')" prop="longitude">
-                <el-input v-model="form.longitude" placeholder="116.4074" />
+                <el-input v-model="form.longitude" placeholder="116.407400" @blur="form.longitude = formatDecimal(form.longitude)" />
               </el-form-item>
             </el-col>
             <el-col :lg="12">
               <el-form-item :label="$t('radar.northDeviationAngle')" prop="northDeviationAngle">
-                <el-input v-model="form.northDeviationAngle" placeholder="0" />
+                <el-input v-model="form.northDeviationAngle" placeholder="0.000000" @blur="form.northDeviationAngle = formatDecimal(form.northDeviationAngle)" />
               </el-form-item>
             </el-col>
             <el-col :lg="12">
@@ -137,13 +137,24 @@
         :show-overflow-tooltip="true"
       />
 
-      <el-table-column prop="latitude" :label="$t('radar.latitude')" width="120" align="center" />
-      <el-table-column prop="longitude" :label="$t('radar.longitude')" width="120" align="center" />
+      <el-table-column :label="$t('radar.latitude')" width="140" align="center">
+        <template #default="scope">
+          {{ Number(scope.row.latitude).toFixed(6) }}
+        </template>
+      </el-table-column>
+      <el-table-column :label="$t('radar.longitude')" width="140" align="center">
+        <template #default="scope">
+          {{ Number(scope.row.longitude).toFixed(6) }}
+        </template>
+      </el-table-column>
       <el-table-column
-        prop="northDeviationAngle"
         :label="$t('radar.northDeviationAngle')"
         align="center"
-      />
+      >
+        <template #default="scope">
+          {{ Number(scope.row.northDeviationAngle).toFixed(6) }}
+        </template>
+      </el-table-column>
 
       <el-table-column prop="defenceRadius" :label="$t('radar.defenceRadius')" align="center" />
       <el-table-column prop="defenceAngle" :label="$t('radar.defenceAngle')" align="center" />
@@ -213,17 +224,17 @@
           </el-col>
           <el-col :lg="12">
             <el-form-item :label="$t('radar.northDeviationAngle')" prop="northDeviationAngle">
-              <el-input v-model="form.northDeviationAngle" />
+              <el-input v-model="form.northDeviationAngle" @blur="form.northDeviationAngle = formatDecimal(form.northDeviationAngle)" />
             </el-form-item>
           </el-col>
           <el-col :lg="12">
             <el-form-item :label="$t('radar.latitude')" prop="latitude">
-              <el-input v-model="form.latitude" />
+              <el-input v-model="form.latitude" @blur="form.latitude = formatDecimal(form.latitude)" />
             </el-form-item>
           </el-col>
           <el-col :lg="12">
             <el-form-item :label="$t('radar.longitude')" prop="longitude">
-              <el-input v-model="form.longitude" />
+              <el-input v-model="form.longitude" @blur="form.longitude = formatDecimal(form.longitude)" />
             </el-form-item>
           </el-col>
 
@@ -271,6 +282,7 @@
 
 <script>
 import { getConfigKey } from '@/api/config/config'
+import { formatDecimal } from '@/utils/format'
 import { addRadar, delRadar, getRadar, listRadar, updateRadar } from '@/api/device/radar'
 
 export default {
@@ -394,10 +406,10 @@ export default {
         ip: null,
         port: '50000',
         status: '1',
-        latitude: '0',
-        longitude: '0',
-        northDeviationAngle: '0',
-        radarType: ' ',
+        latitude: '0.000000',
+        longitude: '0.000000',
+        northDeviationAngle: '0.000000',
+        radarType: '',
         defenceAngle: '90',
         defenceRadius: '500',
       }
@@ -428,11 +440,11 @@ export default {
           .map((item) => item.trim())
 
         if (latitude !== undefined && latitude !== '') {
-          this.form.latitude = latitude
+          this.form.latitude = this.formatDecimal(latitude)
         }
 
         if (longitude !== undefined && longitude !== '') {
-          this.form.longitude = longitude
+          this.form.longitude = this.formatDecimal(longitude)
         }
       })
     },
@@ -455,6 +467,9 @@ export default {
       const Ids = row.id || this.ids
       getRadar(Ids).then((response) => {
         this.form = response.data.data
+        this.form.latitude = this.formatDecimal(this.form.latitude)
+        this.form.longitude = this.formatDecimal(this.form.longitude)
+        this.form.northDeviationAngle = this.formatDecimal(this.form.northDeviationAngle)
         this.open = true
         this.title = this.$t('common.edit')
       })
@@ -522,6 +537,7 @@ export default {
       try { localStorage.removeItem('wizard') } catch (e) {}
       try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' })) } catch (e) {}
     },
+    formatDecimal,
   },
 }
 </script>

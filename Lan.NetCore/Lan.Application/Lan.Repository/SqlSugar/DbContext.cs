@@ -11,12 +11,12 @@ namespace Lan.Repository.SqlSugar
 {
     public class DbContext<T> where T : class, new()
     {
-        // 全局唯一 SqlSugarClient（延迟初始化，线程安全）
-        // SqlSugarClient 官方推荐单例模式，共享实例可复用内部元数据缓存和连接池
-        private static readonly Lazy<SqlSugarClient> _sharedClient = new(() =>
+        // 全局唯一 SqlSugarScope（延迟初始化，线程安全）
+        // SqlSugarScope 是 SqlSugarClient 的线程安全版本，专为单例+多线程场景设计
+        private static readonly Lazy<ISqlSugarClient> _sharedClient = new(() =>
         {
             var connStr = AppSettings.Get<string>("ConnectionStrings:conn");
-            return new SqlSugarClient(new ConnectionConfig()
+            return new SqlSugarScope(new ConnectionConfig()
             {
                 DbType = DbType.MySql,
                 ConnectionString = connStr,
@@ -25,8 +25,8 @@ namespace Lan.Repository.SqlSugar
             });
         });
 
-        /// <summary>全局共享的 SqlSugar 客户端实例</summary>
-        public SqlSugarClient Db => _sharedClient.Value;
+        /// <summary>全局共享的 SqlSugar 客户端实例（线程安全）</summary>
+        public ISqlSugarClient Db => _sharedClient.Value;
 
         public SimpleClient<T> CurrentDb => new(Db);
 

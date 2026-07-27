@@ -176,8 +176,9 @@ namespace Lan.Application
             // 触发 GlobalVariable 初始化（依赖 App.GetService，必须在容器构建后调用）
             app.Services.GetRequiredService<GlobalVariable>();
 
-            // Read CORS origins from configuration array `CorsUrls`.
-            var corsOrigins = builder.Configuration.GetSection("CorsUrls").Get<string[]>() ?? [];
+            // Read CORS origins from configuration array `CorsUrls`，自动追加本机 IP
+            var corsOrigins = builder.Configuration.GetSection("CorsUrls").Get<string[]>()?.ToList() ?? [];
+            AutoAppendLocalIpCors(corsOrigins);
 
             // ---- 应用初始化（在管道构建前执行） ----
             app.CameraInit();
@@ -204,7 +205,25 @@ namespace Lan.Application
                 {
                     context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                     context.Response.ContentType = "application/json";
-                    await context.Response.WriteAsync("{\"code\":500,\"msg\":\"Internal Server Error\"}");
+
+                    var exceptionHandlerPathFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+                    var exception = exceptionHandlerPathFeature?.Error;
+                    var errorMsg = exception?.Message ?? "Internal Server Error";
+                    var stackTrace = exception?.StackTrace ?? "";
+
+                    // 写入控制台日志，方便调试
+                    Console.Error.WriteLine($"[500 ERROR] {context.Request.Method} {context.Request.Path}: {errorMsg}");
+                    if (exception != null)
+                        Console.Error.WriteLine(exception.ToString());
+
+                    var errorJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        code = 500,
+                        msg = errorMsg,
+                        path = context.Request.Path.ToString(),
+                        stackTrace = context.Request.Host.Host == "localhost" ? stackTrace : ""
+                    });
+                    await context.Response.WriteAsync(errorJson);
                 });
             });
 
@@ -220,7 +239,7 @@ namespace Lan.Application
             // 3. CORS
             app.UseCors(opt =>
             {
-                opt.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+                opt.WithOrigins(corsOrigins.ToArray()).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
             });
 
             // 4. 认证 & 授权
@@ -232,6 +251,24 @@ namespace Lan.Application
             app.MapControllers();
 
             app.Run();
+        }
+
+        /// <summary>
+        /// 自动检测本机 IPv4 地址，追加前端 (5122) 和后端 (1233) 的 CORS 白名单
+        /// </summary>
+        private static void AutoAppendLocalIpCors(List<string> corsOrigins)
+        {
+            var localIps = ConfigJsUpdater.GetAllLocalIPv4();
+            foreach (var ip in localIps)
+            {
+                var frontend = $"http://{ip}:5122";
+                var backend = $"http://{ip}:1233";
+
+                if (!corsOrigins.Contains(frontend))
+                    corsOrigins.Add(frontend);
+                if (!corsOrigins.Contains(backend))
+                    corsOrigins.Add(backend);
+            }
         }
     }
 }

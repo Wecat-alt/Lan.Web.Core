@@ -966,8 +966,8 @@ function initRadar() {
 let rippleAnimationId = null
 let activeRipples = []
 const RIPPLE_COUNT = 3
-const RIPPLE_INTERVAL = 1500 // 每1.5秒发射一条
-const RIPPLE_LIFETIME = 4500 // 每条存活4.5秒，保持3条同时可见
+const RIPPLE_INTERVAL = 2000 // 每2秒发射一条
+const RIPPLE_LIFETIME = 6000 // 每条存活6秒，保持3条同时可见
 const SECTOR_CX = 500
 const SECTOR_CY = 700
 const SECTOR_R = (500 / 250) * 280
@@ -975,19 +975,21 @@ const SECTOR_A1 = (225 * Math.PI) / 180
 const SECTOR_A2 = (315 * Math.PI) / 180
 
 function initRadarRipple() {
+  const now = performance.now()
   activeRipples = []
+  // 用过去时初始化，按正常间隔分布，立即显示 3 条处于不同进度的波纹
   for (let i = 0; i < RIPPLE_COUNT; i++) {
-    activeRipples.push({ startTime: performance.now() + i * (RIPPLE_INTERVAL / RIPPLE_COUNT) })
+    activeRipples.push({ startTime: now - (RIPPLE_COUNT - 1 - i) * RIPPLE_INTERVAL })
   }
+  // startTime: now-4000, now-2000, now → 对应 67%、33%、0% 进度
 
-  let lastEmitTime = performance.now()
+  let lastEmitTime = now
 
   function drawFrame(now) {
-    // 发射新波纹
+    // 发射新波纹（自然淘汰由 filter 中的 RIPPLE_LIFETIME 控制）
     if (now - lastEmitTime >= RIPPLE_INTERVAL) {
       activeRipples.push({ startTime: now })
       lastEmitTime = now
-      if (activeRipples.length > RIPPLE_COUNT + 1) activeRipples.shift()
     }
 
     const canvas = radarCanvas.value

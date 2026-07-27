@@ -411,6 +411,22 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
                 TargetPacketReceived?.Invoke(targetPacket);
                 TargetUploadPacketReceived?.Invoke(packet.Length);
                 TargetUploadPacketDetected?.Invoke(cmd, packet.Length);
+
+                // 调试：打印第1个目标的原始 hex（验证 Z/Elevation 偏移量是否正确）
+                if (targetPacket.Targets.Count > 0)
+                {
+                    int tds = cmd == TargetUploadCommandA9 ? 11 : 8;
+                    if (packet.Length >= tds + 68)
+                    {
+                        var raw = packet.Slice(tds, 68);
+                        Console.WriteLine(
+                            $"[RAW TARGET hex:{tds}] Z(28-31)={raw[28]:X2}{raw[29]:X2}{raw[30]:X2}{raw[31]:X2} " +
+                            $"Elev(40-43)={raw[40]:X2}{raw[41]:X2}{raw[42]:X2}{raw[43]:X2} " +
+                            $"X(20-23)={raw[20]:X2}{raw[21]:X2}{raw[22]:X2}{raw[23]:X2} " +
+                            $"Y(24-27)={raw[24]:X2}{raw[25]:X2}{raw[26]:X2}{raw[27]:X2} " +
+                            $"Area(52-53)={raw[52]:X2}{raw[53]:X2}");
+                    }
+                }
                 break;
 
             default:
@@ -496,8 +512,7 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
             Snr = ReadSingleLittleEndian(packet, offset + 44),
             PeakEnergy = ReadSingleLittleEndian(packet, offset + 48),
             Area = BinaryPrimitives.ReadUInt16LittleEndian(packet.Slice(offset + 52, 2)),
-            Channel = BinaryPrimitives.ReadUInt16LittleEndian(packet.Slice(offset + 54, 2)),
-            Reserved = packet.Slice(offset + 56, 12).ToArray()
+            Reserved = packet.Slice(offset + 54, 14).ToArray()
         };
     }
 

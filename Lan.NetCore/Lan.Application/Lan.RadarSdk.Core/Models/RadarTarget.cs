@@ -20,6 +20,5 @@ public sealed class RadarTarget
     public float Snr { get; init; }
     public float PeakEnergy { get; init; }
     public ushort Area { get; init; }
-    public ushort Channel { get; init; }
     public required byte[] Reserved { get; init; }
 }
