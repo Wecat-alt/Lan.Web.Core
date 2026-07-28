@@ -1,6 +1,6 @@
 <template>
   <div class="container">
-    <div class="left" id="map-container"></div>
+    <div class="left" id="map-container" ref="mapContainerRef"></div>
     <div class="right">
       <video
         ref="videoPlayer"
@@ -23,7 +23,7 @@ import { ints } from '@/utils/mapUtils'
 import L from 'leaflet'
 import 'leaflet.motion/dist/leaflet.motion.js'
 import 'leaflet/dist/leaflet.css'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 // 常量定义
 const mapCenter_lat = 28.202612
@@ -35,6 +35,7 @@ const mapZoom = 16
 const videoSrc = ref('')
 const videoPlayer = ref(null)
 const map = ref(null)
+const mapContainerRef = ref(null)
 const timer = ref(null)
 
 const queryParams = ref({
@@ -45,9 +46,29 @@ const queryParams = ref({
 
 // 方法定义
 const initMap = () => {
+  const container = mapContainerRef.value
+  if (!container) {
+    console.error('地图容器不存在')
+    return
+  }
+
+  // 彻底清理容器
+  container.innerHTML = ''
+  container.removeAttribute('style')
+  container.classList.forEach((cls) => {
+    if (cls.startsWith('leaflet-')) container.classList.remove(cls)
+  })
+
+  // 确保容器有高度
+  if (container.clientHeight === 0) {
+    console.warn('地图容器高度为0，延迟初始化')
+    setTimeout(() => initMap(), 100)
+    return
+  }
+
   console.log('回放地图URL：', mapUrl)
 
-  map.value = L.map('map-container', {
+  map.value = L.map(container, {
     center: [mapCenter_lat, mapCenter_lng],
     zoom: mapZoom,
     attributionControl: false,
@@ -142,15 +163,23 @@ const initAlarm = async () => {
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
+  await nextTick()
   initMap()
   initAlarm()
 })
 
 onUnmounted(() => {
-  // 清理工作
   if (timer.value) {
     clearTimeout(timer.value)
+  }
+  if (map.value) {
+    map.value.remove()
+    map.value = null
+  }
+  // 清理容器 DOM
+  if (mapContainerRef.value) {
+    mapContainerRef.value.innerHTML = ''
   }
 })
 </script>

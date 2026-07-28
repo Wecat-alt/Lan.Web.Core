@@ -134,6 +134,13 @@ export default {
     defenceEnable: 'Arm/Disarm',
     select_camera: 'Select Camera',
     select_radar: 'Select Radar',
+    bindDevice: 'Bind Device',
+    bindCamera: 'Select Camera',
+    bindRadar: 'Select Radar',
+    boundTo: 'Bound to: ',
+    availableDevice: 'Available',
+    selectedDevice: 'Selected',
+    noDeviceAvailable: 'No devices available',
   },
   gis: {
     id: 'ID:',

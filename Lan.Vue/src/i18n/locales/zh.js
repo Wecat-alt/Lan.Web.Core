@@ -137,6 +137,13 @@ export default {
     defenceEnable: '撤布防状态',
     select_camera: '请选择相机',
     select_radar: '请选择雷达',
+    bindDevice: '绑定设备',
+    bindCamera: '选择相机',
+    bindRadar: '选择雷达',
+    boundTo: '已绑定: ',
+    availableDevice: '可选设备',
+    selectedDevice: '已选设备',
+    noDeviceAvailable: '暂无可选设备',
   },
   gis: {
     id: '编号：',

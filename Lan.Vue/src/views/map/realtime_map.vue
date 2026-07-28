@@ -1,6 +1,6 @@
 <template>
   <div class="map-canvas">
-    <div class="full-size" id="map-container"></div>
+    <div class="full-size" id="map-container" ref="mapContainerRef"></div>
     <div class="map-on-con">
       <div class="toggle-btn-group">
         <button class="toggle-btn" @click="visible = true">
@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { getCurrentInstance, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 import { listRadar, updateLatLng, updateRadar } from '@/api/device/radar'
 import { addDrawPolygon, delDrawPolygon, listDrawPolygon } from '@/api/map/map'
@@ -153,6 +153,7 @@ const mapCenter_lng = ref(0)
 const mapZoom = ref(16)
 
 let map = ref(null)
+const mapContainerRef = ref(null)
 
 let unsubscribeSignalR = null
 // 长链接数据接口
@@ -333,12 +334,37 @@ function closeAlarmPopup() {
   }, 2000)
 }
 
-handall()
-init(longLinkApi, longLinkMsg, longLinkSendMsg)
+onMounted(async () => {
+  await nextTick()
 
-onMounted(() => {
+  // 先加载配置，确保 initMap 直接用正确的中心点和缩放
+  try {
+    const centerRes = await proxy.getConfigKey('mapCenter')
+    if (centerRes?.data?.data) {
+      const ss = centerRes.data.data.split(',')
+      mapCenter_lat.value = parseFloat(ss[0])
+      mapCenter_lng.value = parseFloat(ss[1])
+    }
+  } catch (e) {}
+  try {
+    const zoomRes = await proxy.getConfigKey('mapZoom')
+    if (zoomRes?.data?.data) {
+      mapZoom.value = parseInt(zoomRes.data.data)
+    }
+  } catch (e) {}
+  try {
+    const isOpenRes = await proxy.getConfigKey('isOpen')
+    if (isOpenRes?.data?.data) {
+      alarmAutoPopupEnabled.value = String(isOpenRes.data.data) === '1'
+    }
+  } catch (e) {}
+
   initDrawPolygon()
   initMap()
+
+  // 地图就绪后再启动 SignalR 和绘制雷达扇区
+  handall()
+  init(longLinkApi, longLinkMsg, longLinkSendMsg)
 })
 function handleselect() {
   var tt = radarOptions.value.find((item) => item.id === queryParams.id)
@@ -484,9 +510,29 @@ function handall() {
 }
 
 function initMap() {
+  const container = mapContainerRef.value
+  if (!container) {
+    console.error('地图容器不存在')
+    return
+  }
+
+  // 彻底清理容器（防止 Leaflet 残留 DOM 状态）
+  container.innerHTML = ''
+  container.removeAttribute('style')
+  container.classList.forEach((cls) => {
+    if (cls.startsWith('leaflet-')) container.classList.remove(cls)
+  })
+
+  // 确保容器有高度，否则 Leaflet 会渲染白屏
+  if (container.clientHeight === 0) {
+    console.warn('地图容器高度为0，延迟初始化')
+    setTimeout(() => initMap(), 100)
+    return
+  }
+
   console.log('地图URL：', mapUrl)
 
-  map.value = L.map('map-container', {
+  map.value = L.map(container, {
     center: [mapCenter_lat.value, mapCenter_lng.value],
     zoom: mapZoom.value,
     attributionControl: false,
@@ -495,19 +541,8 @@ function initMap() {
 
   L.tileLayer(mapUrl).addTo(map.value)
 
-  proxy.getConfigKey('mapCenter').then((response) => {
-    var ss = response.data.data.split(',')
-    var newLatLng = L.latLng(parseFloat(ss[0]), parseFloat(ss[1]))
-    map.value.setView(newLatLng)
-  })
-
-  proxy.getConfigKey('mapZoom').then((response) => {
-    map.value.setZoom(parseInt(response.data.data))
-  })
-
-  proxy.getConfigKey('isOpen').then((response) => {
-    alarmAutoPopupEnabled.value = String(response.data.data) === '1'
-  })
+  // 强制刷新尺寸，防止容器高度变化导致白屏
+  setTimeout(() => map.value?.invalidateSize(), 50)
 
   // 初始化轨迹管理器
   initTrackManager()
@@ -731,8 +766,14 @@ onBeforeUnmount(() => {
   }
   radarAlertSwitcher.resetAll()
 
-  map.value.remove()
-  map.value = null
+  if (map.value) {
+    map.value.remove()
+    map.value = null
+  }
+  // 清理容器 DOM，防止残留状态影响下次初始化
+  if (mapContainerRef.value) {
+    mapContainerRef.value.innerHTML = ''
+  }
 })
 
 // 初始化轨迹管理器

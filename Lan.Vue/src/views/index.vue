@@ -18,7 +18,7 @@
       </div>
     </el-header>
     <el-main class="app-main">
-      <component :is="currentView" />
+      <component :is="currentView" :key="currentViewKey" />
     </el-main>
     <!-- <el-footer class="app-footer">
           <div class="footer-content">
@@ -31,7 +31,7 @@
 <script>
 import { canAccessMenu, getAuthProfile } from '@/utils/permission'
 import { ensureSignalRConnection, setSignalRReceiveEnabled } from '@/utils/signalRUtils'
-import { defineComponent, getCurrentInstance, onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import { defineComponent, getCurrentInstance, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 
 import AppSidebar from '../components/AppSidebar.vue'
 import Home from '../views/Home.vue'
@@ -100,6 +100,7 @@ export default defineComponent({
     }
 
     const currentView = shallowRef(views[resolveFirstAllowedMenu()] || realtime_map)
+    const currentViewKey = ref(0)
     const signalRApi = window.__APP_CONFIG__.VITE_SIGNALR_URL
 
     const updateSignalRReceiveState = (viewKey) => {
@@ -125,19 +126,15 @@ export default defineComponent({
         return
       }
 
-      // if (view === 'autoMap') {
-      //   const lang = localStorage.getItem('language') || 'zh'
-      //   window.open(`/autoMap?lang=${lang}`, '_blank')
-      //   return
-      // }
-
       if (view === 'radar' && wizardStep) {
         currentView.value = views['radar'] || realtime_map
+        currentViewKey.value++
         updateSignalRReceiveState('radar')
         return
       }
 
       currentView.value = views[view] || realtime_map
+      currentViewKey.value++
       updateSignalRReceiveState(view)
     }
 
@@ -145,6 +142,7 @@ export default defineComponent({
       const next = e && e.detail ? e.detail : null
       if (next && views[next]) {
         currentView.value = views[next]
+        currentViewKey.value++
       }
     }
 
@@ -163,6 +161,7 @@ export default defineComponent({
 
     return {
       currentView,
+      currentViewKey,
       username,
       handleMenuChange,
     }

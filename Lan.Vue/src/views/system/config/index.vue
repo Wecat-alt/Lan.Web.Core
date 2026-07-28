@@ -34,20 +34,18 @@
     <el-table v-loading="loading" :data="configList" border stripe header-cell-class-name="el-table-header-cell" highlight-current-row 
     @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="NO." align="center" prop="configId" />
-      <el-table-column :label="$t('config.configName')" align="center" prop="configName" />
-      <el-table-column :label="$t('config.configKey')" align="center" prop="configKey" />
-      <el-table-column :label="$t('config.configValue')" align="center" prop="configValue" width="280" />
-      <!-- <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="NO." align="center" prop="configId" width="90" />
+      <el-table-column :label="$t('config.configName')" align="center" prop="configName" min-width="140" />
+      <el-table-column :label="$t('config.configKey')" align="center" prop="configKey" min-width="140" />
+      <el-table-column :label="$t('config.configValue')" align="center" prop="configValue" min-width="320" />
+      <el-table-column label="操作" align="center" width="120">
         <template #default="scope">
-          <el-button size="small" text icon="edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:config:edit']">
-            修改
+          <el-button type="success" size="small" icon="edit" :title="$t('common.edit')" @click="handleUpdate(scope.row)" v-hasPermi="['system:config:edit']">
           </el-button>
-          <el-button size="small" text icon="delete" @click="handleDelete(scope.row)" v-hasPermi="['system:config:remove']">
-            删除
+          <el-button type="danger" size="small" icon="delete" :title="$t('common.delete')" @click="handleDelete(scope.row)" v-hasPermi="['system:config:remove']">
           </el-button>
         </template>
-      </el-table-column> -->
+      </el-table-column>
     </el-table>
 
     <!-- <pagination v-model:total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" /> -->

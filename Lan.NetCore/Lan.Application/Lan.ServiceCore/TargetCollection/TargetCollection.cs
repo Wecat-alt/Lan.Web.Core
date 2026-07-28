@@ -229,6 +229,7 @@ namespace Lan.ServiceCore.TargetCollection
                 RadarIp              = radar.Ip,
                 AxesX                = tar.AxesX,
                 AxesY                = tar.AxesY,
+                AxesZ                = tar.AxesZ,
                 AreaId               = areaId
             };
             Worker.AddTarget(sms);
@@ -293,6 +294,7 @@ namespace Lan.ServiceCore.TargetCollection
         public string RadarIp { get; set; }
         public float AxesX { get; set; }
         public float AxesY { get; set; }
+        public float AxesZ { get; set; }
         public int AreaId { get; set; }
     }
 

@@ -24,6 +24,8 @@ namespace Lan.ServiceCore.IService
         int DeleteDefencearea(int[] id);
         List<DefenceareaModel> GetAllList();
 
+        int BindDevices(BindDeviceDto dto);
+
         List<TreeSelectVo> BuildDeptTreeSelect(List<DefenceareaDtoParent> depts);
     }
 }

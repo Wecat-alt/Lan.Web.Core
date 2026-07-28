@@ -1,22 +1,15 @@
-﻿using Dm.util;
-using Infrastructure;
-using Lan.Infrastructure.CameraOnvif;
+﻿using Lan.Infrastructure.CameraOnvif;
 using Lan.ServiceCore.IService;
 using Lan.ServiceCore.Onvif;
 using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Services;
 using Lan.ServiceCore.WebScoket;
 using MemoryCache.Core;
-using Model;
 using NetTopologySuite.Geometries;
-using Newtonsoft.Json;
-using SharpJaad.AAC.Tools;
-using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace Lan.ServiceCore.TargetCollection
 {
@@ -86,6 +79,11 @@ namespace Lan.ServiceCore.TargetCollection
 
 
         private RBTrackSdk.TrackCallBack _TrackCallBack;
+
+        // 多相机轮询跟踪
+        private int _trackRound = 0;
+        private DateTime _lastTargetRotationTime;
+        private HashSet<int> _lastTargetIds = new HashSet<int>();
 
 
         #endregion
@@ -187,6 +185,7 @@ namespace Lan.ServiceCore.TargetCollection
             _lastTarget = null;
             //_maxFilter = new MaxFilter();
             _lastManualControlTime = _cameraSwitchTargetEndTime = _trackTime = DateTime.Now;
+            _lastTargetRotationTime = DateTime.Now;
 
             Alarming = false;
             TargetSyncLock = new object();
@@ -516,57 +515,81 @@ namespace Lan.ServiceCore.TargetCollection
                     continue;
                 }
 
-                //if (MemoryCacheHelper.Exists("RBTrack"))
-                //{
-                //    _list_RBTRACK = MemoryCacheHelper.Get<List<RBTRACK_Info>>("RBTrack");
-                //}
                 if (_cache?.Exists("RBTrack") == true)
                 {
                     _list_RBTRACK = _cache.Get<List<RBTRACK_Info>>("RBTrack");
                 }
 
-                int channelId = -1;
-
                 WCamera[] cameras = CameraManager.GetInstance().GetBindingCameraOfDefenceArea(tarItem[0].AreaId);
 
-                RADAR_TARGETS_T[] list_RADAR_TARGETS_T = new RADAR_TARGETS_T[tarItem.Count];
+                if (cameras.Length == 0 || _list_RBTRACK?.Count == 0)
+                    continue;
+
+                // --- 检测目标变化，决定是否重置轮询 ---
+                var currentTargetIds = new HashSet<int>();
                 for (int i = 0; i < tarItem.Count; i++)
+                    currentTargetIds.Add(tarItem[i].TargetId);
+
+                bool targetsChanged = !_lastTargetIds.SetEquals(currentTargetIds);
+                if (targetsChanged)
                 {
-
-                    //Console.WriteLine(tarItem[i].TargetId + "@" + tarItem[i].AxesX + "@" + tarItem[i].AxesY);
-
-                    RADAR_TARGETS_T _RADAR_TARGETS_T = new RADAR_TARGETS_T();
-
-                    _RADAR_TARGETS_T.targetId = tarItem[i].TargetId;                     //目标ID范围0x01~0x40
-                    _RADAR_TARGETS_T.type = (uint)tarItem[i].TargetType;                //目标类型
-                    _RADAR_TARGETS_T.speed_X = float.Parse(tarItem[i].SpeedX);                      //X方向速度
-                    _RADAR_TARGETS_T.speed_Y = float.Parse(tarItem[i].SpeedY);                      //Y方向速度
-                    _RADAR_TARGETS_T.cod_X = tarItem[i].AxesX;
-                    _RADAR_TARGETS_T.cod_Y = tarItem[i].AxesY;
-                    _RADAR_TARGETS_T.distance = float.Parse(tarItem[i].Distance);                     //目标距离
-                    _RADAR_TARGETS_T.azimuth = float.Parse(tarItem[i].AzimuthAngle);                      //目标方位角
-
-                    list_RADAR_TARGETS_T[i] = _RADAR_TARGETS_T;
-
-                    cameraNoControlCount = 0;
+                    _trackRound = 0;
+                    _lastTargetIds = currentTargetIds;
                 }
 
-                if (cameras.Length > 0)
+                // --- 检查是否到达轮换时间 ---
+                int rotationInterval = GlobalVariable.maxAlarmTime > 0 ? GlobalVariable.maxAlarmTime : 15;
+                if ((DateTime.Now - _lastTargetRotationTime).TotalSeconds >= rotationInterval)
                 {
-                    if (_list_RBTRACK?.Count > 0)
+                    _trackRound++;
+                    _lastTargetRotationTime = DateTime.Now;
+                }
+
+                // --- 为每台启用了跟踪的相机分配单个目标 ---
+                // 统计启用跟踪的相机数量（用于轮询公式）
+                int trackingCameraCount = 0;
+                for (int c = 0; c < cameras.Length; c++)
+                {
+                    if (cameras[c].IsTrack == 1) trackingCameraCount++;
+                }
+
+                // 目标不够分配时，多余的相机不跟踪
+                int trackCount = Math.Min(trackingCameraCount, tarItem.Count);
+                int assignedCount = 0;
+
+                for (int camIdx = 0; camIdx < cameras.Length; camIdx++)
+                {
+                    if (cameras[camIdx].IsTrack != 1)
+                        continue;
+
+                    if (assignedCount >= trackCount)
+                        break;  // 目标不够分配，多余相机不跟踪
+
+                    int targetIdx = (assignedCount + _trackRound * trackingCameraCount) % tarItem.Count;
+
+                    for (int j = 0; j < _list_RBTRACK.Count; j++)
                     {
-                        for (int j = 0; j < _list_RBTRACK.Count; j++)
+                        if (_list_RBTRACK[j].CameraIp == cameras[camIdx].Ip
+                            && _list_RBTRACK[j].DefenceareaId == tarItem[0].AreaId.ToString()
+                            && _list_RBTRACK[j].channelId != -1)
                         {
-                            if (_list_RBTRACK[j].CameraIp == cameras[0].Ip && _list_RBTRACK[j].DefenceareaId == tarItem[0].AreaId.ToString() && _list_RBTRACK[j].channelId != -1)
-                            {
-                                if (cameras[0].IsTrack == 1)
-                                {
-                                    channelId = _list_RBTRACK[j].channelId;
-                                    int s = RBTrackSdk.RBTRACK_UpdateTargets(channelId, list_RADAR_TARGETS_T, list_RADAR_TARGETS_T.Length);
-                                }
-                            }
+                            RADAR_TARGETS_T target = new RADAR_TARGETS_T();
+                            target.targetId = tarItem[targetIdx].TargetId;
+                            target.type = (uint)tarItem[targetIdx].TargetType;
+                            target.speed_X = float.Parse(tarItem[targetIdx].SpeedX);
+                            target.speed_Y = float.Parse(tarItem[targetIdx].SpeedY);
+                            target.cod_X = tarItem[targetIdx].AxesX;
+                            target.cod_Y = tarItem[targetIdx].AxesY;
+                            target.cod_Z = tarItem[targetIdx].AxesZ;
+                            target.distance = float.Parse(tarItem[targetIdx].Distance);
+                            target.azimuth = float.Parse(tarItem[targetIdx].AzimuthAngle);
+
+                            RBTrackSdk.RBTRACK_UpdateTargets(_list_RBTRACK[j].channelId, ref target, 1);
+                            break;
                         }
                     }
+
+                    assignedCount++;
                 }
             }
         }

@@ -96,6 +96,13 @@ namespace Lan.Application.Controllers
             return Message(res);
         }
 
+        [HttpPut("bindDevices")]
+        public IActionResult BindDevices([FromBody] BindDeviceDto parm)
+        {
+            var response = _DefenceareaService.BindDevices(parm);
+            return Message(response);
+        }
+
 
         [HttpDelete("delete/{ids}")]
         public IActionResult DeleteDefencearea([FromRoute] string ids)

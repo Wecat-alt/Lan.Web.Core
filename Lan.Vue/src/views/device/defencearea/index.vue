@@ -38,20 +38,6 @@
               </el-form-item>
             </el-col>
             <el-col :lg="12">
-              <el-form-item :label="$t('common.camera')">
-                <el-select v-model="form.cameraId" clearable class="w-select">
-                  <el-option v-for="dict in cameraOptions" :key="dict.id" :label="dict.ip" :value="dict.id" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :lg="12">
-              <el-form-item :label="$t('radar.ip')">
-                <el-select v-model="form.radarId" clearable class="w-select">
-                  <el-option v-for="dict in radarOptions" :key="dict.id" :label="dict.ip" :value="dict.id" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :lg="12">
               <el-form-item :label="$t('zone.defenceEnable')">
                 <el-radio-group v-model="form.defenceEnable">
                   <el-radio v-for="dict in statusOptions" :key="dict.dictValue" :label="parseInt(dict.dictValue)">
@@ -72,6 +58,7 @@
 
     <!-- ══════════ 普通模式 ══════════ -->
     <template v-else>
+    <!-- 搜索区域 -->
     <el-form
       :model="queryParams"
       label-position="right"
@@ -96,6 +83,7 @@
         <el-button icon="refresh" @click="resetQuery">{{ $t('common.reset') }}</el-button>
       </el-form-item>
     </el-form>
+
     <!-- 工具区域 -->
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
@@ -125,6 +113,7 @@
       </el-col>
     </el-row>
 
+    <!-- 表格 -->
     <el-table
       v-loading="loading"
       :data="dataList"
@@ -135,7 +124,7 @@
       @selection-change="handleSelectionChange"
     >
       <el-table-column type="selection" :selectable="selectable" width="55" />
-      <el-table-column prop="id" :label="$t('zone.id')" align="center" />
+      <el-table-column prop="id" :label="$t('zone.id')" align="center" width="100" />
       <el-table-column
         prop="name"
         :label="$t('zone.name')"
@@ -173,8 +162,15 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="$t('radar.actions')" align="center">
+      <el-table-column :label="$t('radar.actions')" align="center" width="230">
         <template #default="scope">
+          <el-button
+            type="primary"
+            size="small"
+            icon="connection"
+            :title="$t('zone.bindDevice')"
+            @click="handleBind(scope.row)"
+          >{{ $t('zone.bindDevice') }}</el-button>
           <el-button
             type="success"
             size="small"
@@ -194,6 +190,7 @@
         </template>
       </el-table-column>
     </el-table>
+
     <pagination
       :total="total"
       v-model:page="queryParams.pageNum"
@@ -201,7 +198,7 @@
       @pagination="getList"
     />
 
-    <!-- 添加或修改对话框 -->
+    <!-- 添加/修改对话框 -->
     <el-dialog :title="title" :lock-scroll="false" v-model="open" :close-on-click-modal="false">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
         <el-row :gutter="20">
@@ -224,7 +221,6 @@
               <el-input v-model="form.defenceRadius" />
             </el-form-item>
           </el-col>
-
           <el-col :lg="12">
             <el-form-item :label="$t('zone.latitude')" prop="latitude">
               <el-input v-model="form.latitude" @blur="form.latitude = formatDecimal(form.latitude)" />
@@ -235,11 +231,8 @@
               <el-input v-model="form.longitude" @blur="form.longitude = formatDecimal(form.longitude)" />
             </el-form-item>
           </el-col>
-
-          <!-- defence_status -->
           <el-col :lg="12">
             <el-form-item :label="$t('zone.defenceEnable')">
-              <!-- <el-input v-model.number="form.defenceEnable" /> -->
               <el-radio-group v-model="form.defenceEnable">
                 <el-radio
                   v-for="dict in statusOptions"
@@ -251,52 +244,6 @@
               </el-radio-group>
             </el-form-item>
           </el-col>
-
-          <el-col :lg="24">
-            <el-form-item :label="$t('common.camera')">
-              <el-select
-                v-model="form.cameraIds"
-                multiple
-                :placeholder="$t('zone.select_camera')"
-                style="width: 100%"
-                @change="selectCamera($event)"
-              >
-                <el-option
-                  v-for="item in cameraOptions"
-                  :key="item.id"
-                  :label="item.ip"
-                  :value="item.id"
-                  :disabled="item.status == 0"
-                >
-                  <span style="float: left">{{ item.ip }}</span>
-                  <span style="float: right">{{ item.id }}</span>
-                </el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-
-          <el-col :lg="24">
-            <el-form-item :label="$t('common.radar')">
-              <el-select
-                v-model="form.radarIds"
-                multiple
-                :placeholder="$t('zone.select_radar')"
-                style="width: 100%"
-                @change="selectRadar($event)"
-              >
-                <el-option
-                  v-for="item in radarOptions"
-                  :key="item.id"
-                  :label="item.ip"
-                  :value="item.id"
-                  :disabled="item.status == 0"
-                >
-                  <span style="float: left">{{ item.ip }}</span>
-                  <span style="float: right">{{ item.id }}</span>
-                </el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
         </el-row>
       </el-form>
       <template #footer v-if="opertype != 3">
@@ -305,6 +252,43 @@
       </template>
     </el-dialog>
     </template>
+
+    <!-- 绑定设备对话框 -->
+    <el-dialog
+      :title="$t('zone.bindDevice') + ' - ' + bindForm.areaName"
+      :lock-scroll="false"
+      v-model="bindOpen"
+      :close-on-click-modal="false"
+      width="750px"
+      class="bind-dialog"
+    >
+      <el-divider content-position="left">
+        {{ $t('zone.bindCamera') }}
+      </el-divider>
+      <el-transfer
+        v-model="bindForm.cameraIds"
+        :data="cameraTransferData"
+        :titles="[$t('zone.availableDevice'), $t('zone.selectedDevice')]"
+        :button-texts="[$t('common.delete'), $t('common.add')]"
+      />
+
+      <el-divider content-position="left" style="margin-top: 24px">
+        {{ $t('zone.bindRadar') }}
+      </el-divider>
+      <el-transfer
+        v-model="bindForm.radarIds"
+        :data="radarTransferData"
+        :titles="[$t('zone.availableDevice'), $t('zone.selectedDevice')]"
+        :button-texts="[$t('common.delete'), $t('common.add')]"
+      />
+
+      <template #footer>
+        <el-button text @click="onBindCancel">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="submitBind" :loading="bindSubmitting">
+          {{ _isWizard ? '保存并继续' : $t('common.save') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -312,45 +296,29 @@
 import { getConfigKey } from '@/api/config/config'
 import { formatDecimal } from '@/utils/format'
 import {
-  getCameraRepetitionJudgmentAdd,
-  getCameraRepetitionJudgmentEdit,
-} from '@/api/device/camera'
-import {
   addDefencearea,
+  bindDevices,
   delDefencearea,
   enableDefencearea,
   getDefencearea,
   listDefencearea,
   updateDefencearea,
 } from '@/api/device/defencearea.js'
-import { getRadarRepetitionJudgmentAdd, getRadarRepetitionJudgmentEdit } from '@/api/device/radar'
-import { ElMessageBox } from 'element-plus'
 
 export default {
   name: 'defencearea',
   data() {
     return {
-      // 遮罩层
       loading: true,
-      // 选中数组
       ids: [],
-      // 非单个禁用
       single: true,
-      // 非多个禁用
       multiple: true,
-      // 显示搜索条件
       showSearch: true,
-      // 总条数
       total: 0,
-      // 表格数据
       dataList: [],
-      // 弹出层标题
       title: '',
-      // 是否显示弹出层
       open: false,
-      // 状态数据字典
       statusOptions: [],
-      // 查询参数
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -358,25 +326,13 @@ export default {
         sortType: 'asc',
         ip: undefined,
       },
-      cameraOptions: ref([]),
-      radarOptions: ref([]),
-      // 表单参数
       form: {},
-      // 表单校验
       rules: {
         name: [
-          {
-            required: true,
-            message: this.$t('validation.name'),
-            trigger: 'blur',
-          },
+          { required: true, message: this.$t('validation.name'), trigger: 'blur' },
         ],
         port: [
-          {
-            required: true,
-            message: this.$t('validation.port'),
-            trigger: 'blur',
-          },
+          { required: true, message: this.$t('validation.port'), trigger: 'blur' },
         ],
         latitude: [
           {
@@ -395,7 +351,18 @@ export default {
           },
         ],
       },
-      // 向导模式标记
+      // 绑定对话框
+      bindOpen: false,
+      bindSubmitting: false,
+      bindForm: {
+        areaId: 0,
+        areaName: '',
+        cameraIds: [],
+        radarIds: [],
+      },
+      cameraTransferData: [],
+      radarTransferData: [],
+      // 向导模式
       _isWizard: false,
       wizardSubmitting: false,
     }
@@ -404,16 +371,15 @@ export default {
     this.getList()
     this.getDicts('defence_status').then((response) => {
       this.statusOptions = response.data.data
-      try {
-        if (localStorage.getItem('wizard') === 'defencearea') {
-          this.handleAdd()
-        }
-      } catch (e) {}
     })
-    getDefencearea(0).then((response) => {
-      this.cameraOptions = response.data.data.cameras
-      this.radarOptions = response.data.data.radars
-    })
+    // 检测向导模式
+    try {
+      if (localStorage.getItem('wizard') === 'defencearea') {
+        this._isWizard = true
+        this.reset()
+        this.fillMapCenterToForm()
+      }
+    } catch (e) {}
   },
   methods: {
     getList() {
@@ -421,7 +387,6 @@ export default {
       listDefencearea(this.queryParams).then((res) => {
         if (res.data.code == 200) {
           this.dataList = res.data.data
-          //total.value = data.totalNum
           this.loading = false
         }
       })
@@ -430,7 +395,6 @@ export default {
       this.open = false
       this.reset()
     },
-    // 表单重置
     reset() {
       this.form = {
         id: undefined,
@@ -440,9 +404,6 @@ export default {
         defenceRadius: 50,
         latitude: '0.000000',
         longitude: '0.000000',
-
-        cameraIds: [],
-        radarIds: [],
       }
       this.resetForm('formRef')
     },
@@ -462,18 +423,13 @@ export default {
     fillMapCenterToForm() {
       getConfigKey('mapCenter').then((response) => {
         const mapCenter = response?.data?.data
-        if (!mapCenter) {
-          return
-        }
-
+        if (!mapCenter) return
         const [latitude, longitude] = String(mapCenter)
           .split(',')
           .map((item) => item.trim())
-
         if (latitude !== undefined && latitude !== '') {
           this.form.latitude = this.formatDecimal(latitude)
         }
-
         if (longitude !== undefined && longitude !== '') {
           this.form.longitude = this.formatDecimal(longitude)
         }
@@ -481,34 +437,23 @@ export default {
     },
     handleAdd() {
       this.reset()
-      this._isWizard = localStorage.getItem('wizard') === 'defencearea'
-      if (this._isWizard) {
-        this.title = this.$t('common.add') + ' - ' + this.$t('nav.zone')
-        this.fillMapCenterToForm()
-      } else {
-        this.open = true
-        this.title = this.$t('common.add')
-        this.fillMapCenterToForm()
-      }
+      this.open = true
+      this.title = this.$t('common.add')
+      this.fillMapCenterToForm()
     },
     handleUpdate(row) {
       this.reset()
       const Ids = row.id || this.ids
       getDefencearea(Ids).then((response) => {
-        const { code, data } = response
-
+        const { data } = response
         this.form.id = data.data.defencearea.id
         this.form.name = data.data.defencearea.name
         this.form.defenceEnable = data.data.defencearea.defenceEnable
         this.form.defenceRadius = data.data.defencearea.defenceRadius
-        this.form.cameraIds = data.data.cameraIds
-        this.form.radarIds = data.data.radarIds
         this.form.latitude = data.data.defencearea.latitude
         this.form.longitude = data.data.defencearea.longitude
-
         this.form.latitude = this.formatDecimal(this.form.latitude)
         this.form.longitude = this.formatDecimal(this.form.longitude)
-
         this.open = true
         this.title = this.$t('common.edit')
       })
@@ -536,14 +481,6 @@ export default {
                 this.$modal.msgSuccess(this.$t('message.addSuccess'))
                 this.open = false
                 this.getList()
-                if (this._isWizard) {
-                  try {
-                    localStorage.setItem('wizard', 'calibration')
-                  } catch (e) {}
-                  try {
-                    window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'calibration' }))
-                  } catch (e) {}
-                }
               } else if (res.data.code == 102) {
                 this.$modal.msgError(this.$t('message.zoneDATA_REPEAT'))
               }
@@ -567,74 +504,6 @@ export default {
           this.$modal.msgSuccess(this.$t('message.deleteSuccess'))
         })
     },
-    selectCamera(e) {
-      if (this.form.id != undefined) {
-        let form = {
-          bindingAreaId: this.form.id,
-          cameraIds: this.form.cameraIds,
-        }
-        //要排除自己
-        getCameraRepetitionJudgmentEdit(form).then((res) => {
-          if (res.data.code == 104) {
-            if (res.data.msg != '') {
-              ElMessageBox.alert(
-                res.data.msg + this.$t('message.zone_tip'),
-                this.$t('common.hint'),
-                { type: 'warning' },
-              )
-            }
-          }
-        })
-      } else {
-        let form = { cameraIds: this.form.cameraIds }
-        getCameraRepetitionJudgmentAdd(form).then((res) => {
-          if (res.data.code == 104) {
-            if (res.data.msg != '') {
-              ElMessageBox.alert(
-                res.data.msg + this.$t('message.zone_tip'),
-                this.$t('common.hint'),
-                { type: 'warning' },
-              )
-            }
-          }
-        })
-      }
-      this.$forceUpdate()
-    },
-    selectRadar(e) {
-      if (this.form.id != undefined) {
-        let form = {
-          bindingAreaId: this.form.id,
-          radarIds: this.form.radarIds,
-        }
-        //要排除自己
-        getRadarRepetitionJudgmentEdit(form).then((res) => {
-          if (res.data.code == 104) {
-            if (res.data.msg != '') {
-              ElMessageBox.alert(
-                res.data.msg + this.$t('message.zone_tip'),
-                this.$t('common.hint'),
-                { type: 'warning' },
-              )
-            }
-          }
-        })
-      } else {
-        let form = { radarIds: this.form.radarIds }
-        getRadarRepetitionJudgmentAdd(form).then((res) => {
-          if (res.data.code == 104) {
-            if (res.data.msg != '') {
-              ElMessageBox.alert(
-                res.data.msg + this.$t('message.zone_tip'),
-                this.$t('common.hint'),
-                { type: 'warning' },
-              )
-            }
-          }
-        })
-      }
-      this.$forceUpdate()
-    },
     handleDefenceEnable(e) {
       enableDefencearea(e).then((res) => {
         if (res.data.code == 200) {
@@ -644,27 +513,117 @@ export default {
         }
       })
     },
+
+    // ══════════ 绑定设备 ══════════
+    handleBind(row) {
+      this.bindForm = {
+        areaId: row.id,
+        areaName: row.name,
+        cameraIds: [],
+        radarIds: [],
+      }
+      this.cameraTransferData = []
+      this.radarTransferData = []
+
+      getDefencearea(row.id).then((response) => {
+        const { data } = response
+        const allCameras = data.data.cameras || []
+        const allRadars = data.data.radars || []
+        const boundCameraIds = data.data.cameraIds || []
+        const boundRadarIds = data.data.radarIds || []
+
+        this.cameraTransferData = allCameras.map((cam) => ({
+          key: cam.id,
+          label: cam.ip + (cam.name ? ' (' + cam.name + ')' : ''),
+          disabled: cam.bindingAreaId > 0 && cam.bindingAreaId !== row.id,
+        }))
+
+        this.radarTransferData = allRadars.map((radar) => ({
+          key: radar.id,
+          label: radar.ip,
+          disabled: radar.bindingAreaId > 0 && radar.bindingAreaId !== row.id,
+        }))
+
+        this.bindForm.cameraIds = [...boundCameraIds]
+        this.bindForm.radarIds = [...boundRadarIds]
+
+        this.bindOpen = true
+      })
+    },
+
+    submitBind() {
+      this.bindSubmitting = true
+      bindDevices({
+        defenceAreaId: this.bindForm.areaId,
+        cameraIds: this.bindForm.cameraIds,
+        radarIds: this.bindForm.radarIds,
+      })
+        .then((res) => {
+          if (res.data.code == 200) {
+            this.$modal.msgSuccess(this.$t('message.editSuccess'))
+            this.bindOpen = false
+            this.getList()
+            // 向导模式：绑定完成后跳转到标定
+            if (this._isWizard) {
+              this.wizardGoNext()
+            }
+          }
+        })
+        .finally(() => {
+          this.bindSubmitting = false
+        })
+    },
+
+    onBindCancel() {
+      this.bindOpen = false
+      // 向导模式下取消绑定，仍然可以继续下一步
+    },
+
     // ══════════ 向导方法 ══════════
     wizardSubmit() {
-      this.wizardSubmitting = true
-      this.submitForm()
-      setTimeout(() => { this.wizardSubmitting = false }, 3000)
+      const formRef = this.$refs['wizardFormRef']
+      if (!formRef) return
+      formRef.validate((valid) => {
+        if (this.form.defenceEnable == 1) this.form.defenceEnableName = '布防'
+        else this.form.defenceEnableName = '撤防'
+
+        if (valid) {
+          this.wizardSubmitting = true
+          addDefencearea(this.form).then((res) => {
+            if (res.data.code == 200) {
+              this.$modal.msgSuccess(this.$t('message.addSuccess'))
+              this.getList()
+              // 拿到新创建的防区ID，打开绑定对话框
+              const newId = res.data.data
+              this.handleBind({ id: newId, name: this.form.name })
+            } else if (res.data.code == 102) {
+              this.$modal.msgError(this.$t('message.zoneDATA_REPEAT'))
+            }
+          }).finally(() => {
+            this.wizardSubmitting = false
+          })
+        }
+      })
     },
     wizardSkip() {
-      try { localStorage.setItem('wizard', 'calibration') } catch (e) {}
-      try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'calibration' })) } catch (e) {}
+      this.wizardGoNext()
     },
     wizardExit() {
       try { localStorage.removeItem('wizard') } catch (e) {}
       try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'realtime_map' })) } catch (e) {}
     },
+    wizardGoNext() {
+      try { localStorage.setItem('wizard', 'calibration') } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('wizard-next', { detail: 'calibration' })) } catch (e) {}
+    },
+
     formatDecimal,
   },
 }
 </script>
 
 <style scoped>
-/* ══════════ 向导布局 ══════════ */
+/* 向导布局 */
 .wizard-layout { min-height: 100vh; background: #f5f7fa; padding: 24px 32px; }
 .wizard-steps { max-width: 800px; margin: 0 auto 32px; padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
 .wizard-body { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
@@ -673,4 +632,10 @@ export default {
 .wizard-desc { margin: 0; font-size: 14px; color: #909399; }
 .wizard-form { margin-bottom: 24px; }
 .wizard-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px; border-top: 1px solid #ebeef5; }
+</style>
+
+<style>
+.bind-dialog .el-transfer-panel .el-transfer-panel__body {
+  height: 160px !important;
+}
 </style>

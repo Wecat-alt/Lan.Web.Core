@@ -57,3 +57,11 @@ export function treeselect() {
     method: 'get'
   })
 }
+
+export function bindDevices(data) {
+  return request({
+    url: 'api/defencearea/bindDevices',
+    method: 'PUT',
+    data: data,
+  })
+}

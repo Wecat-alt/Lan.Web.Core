@@ -3,6 +3,7 @@ using Lan.Dto;
 using Lan.Model;
 using Lan.Repository;
 using Lan.ServiceCore.IService;
+using Lan.ServiceCore.Public;
 using Model;
 using SqlSugar;
 using System;
@@ -53,7 +54,17 @@ namespace Lan.ServiceCore.Services
 
         public int UpdateSysConfig(SysConfig model)
         {
-            return Update(model, true);
+            var result = Update(model, true);
+            // 同步刷新内存中的全局变量
+            if (model.ConfigKey == "maxAlarmTime" && int.TryParse(model.ConfigValue, out int maxAlarm))
+            {
+                GlobalVariable.maxAlarmTime = maxAlarm;
+            }
+            else if (model.ConfigKey == "radarAlarmOvertime" && int.TryParse(model.ConfigValue, out int overtime))
+            {
+                GlobalVariable.radarAlarmOvertime = overtime;
+            }
+            return result;
         }
         public int DeleteSysConfig(object id)
         {

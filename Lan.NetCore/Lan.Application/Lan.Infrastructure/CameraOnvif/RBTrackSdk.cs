@@ -78,6 +78,7 @@ namespace Lan.Infrastructure.CameraOnvif
         public float speed_Y;                      //Y方向速度
         public float cod_X;                        //X方向坐标
         public float cod_Y;                        //Y方向坐标
+        public float cod_Z;                        //Z方向坐标
         public float distance;                     //目标距离
         public float azimuth;                      //目标方位角
     };
@@ -130,7 +131,7 @@ namespace Lan.Infrastructure.CameraOnvif
         //[DllImport("rbtrack_native", EntryPoint = "RBTRACK_UpdateTargets", CallingConvention = CallingConvention.Cdecl)]
         //public static extern int RBTRACK_UpdateTargets(int channelId, IntPtr targets, int targetNum);
         [DllImport("rbtrack_native", EntryPoint = "RBTRACK_UpdateTargets", CallingConvention = CallingConvention.Cdecl)]
-        public static extern int RBTRACK_UpdateTargets(int channelId, RADAR_TARGETS_T[] targets, int targetNum);
+        public static extern int RBTRACK_UpdateTargets(int channelId, ref RADAR_TARGETS_T targets, int targetNum);
 
         /**
         * @brief	删除雷球跟踪

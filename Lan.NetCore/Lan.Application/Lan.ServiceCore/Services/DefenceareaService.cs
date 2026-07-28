@@ -76,27 +76,10 @@ namespace Lan.ServiceCore.Services
 
             if (id > 0)
             {
-                if (model.CameraIds != null)
-                {
-                    if (model.CameraIds.Length > 0)
-                    {
-                        CameraService.unUpdateBindCamera(id);
-                        CameraService.UpdateBindCamera(model, id);
-                    }
-                }
-
-                if (model.RadarIds != null)
-                {
-                    if (model.RadarIds.Length > 0)
-                    {
-                        RadarService.unUpdateBindRadar(id);
-                        RadarService.UpdateBindRadar(model, id);
-                    }
-                }
+                BaseService.LoadDefenceAreaAdd(id);
             }
-            BaseService.LoadDefenceAreaAdd(id);
             GlobalVariable.TrackStatus = true;
-            return 1;
+            return id;
         }
         public bool GetInfoByName(string Name)
         {
@@ -122,11 +105,6 @@ namespace Lan.ServiceCore.Services
         public int UpdateDefencearea(DefenceareaModel model)
         {
             GlobalVariable.TrackStatus = false;
-            CameraService.unUpdateBindCamera(model.Id);
-            RadarService.unUpdateBindRadar(model.Id);
-
-            CameraService.UpdateBindCamera(model, model.Id);
-            RadarService.UpdateBindRadar(model, model.Id);
 
             BaseService.LoadDefenceAreaUpdate(model);
 
@@ -134,6 +112,36 @@ namespace Lan.ServiceCore.Services
             GlobalVariable.TrackStatus = true;
             return i;
         }
+        public int BindDevices(BindDeviceDto dto)
+        {
+            GlobalVariable.TrackStatus = false;
+
+            // 1. 解绑所有旧设备
+            CameraService.unUpdateBindCamera(dto.DefenceAreaId);
+            RadarService.unUpdateBindRadar(dto.DefenceAreaId);
+
+            // 2. 绑定新相机（UpdateBindCamera 内部同时更新 CameraManager 单例）
+            if (dto.CameraIds?.Length > 0)
+            {
+                var cameraModel = new DefenceareaModel { Id = dto.DefenceAreaId, CameraIds = dto.CameraIds };
+                CameraService.UpdateBindCamera(cameraModel, dto.DefenceAreaId);
+            }
+
+            // 3. 绑定新雷达（UpdateBindRadar 内部同时更新 RadarManager 单例）
+            if (dto.RadarIds?.Length > 0)
+            {
+                var radarModel = new DefenceareaModel { Id = dto.DefenceAreaId, RadarIds = dto.RadarIds };
+                RadarService.UpdateBindRadar(radarModel, dto.DefenceAreaId);
+            }
+
+            // 4. 更新 DefenceAreaManager 单例中的 WDefenceArea
+            var defencearea = GetInfo(dto.DefenceAreaId);
+            BaseService.LoadDefenceAreaUpdate(defencearea);
+
+            GlobalVariable.TrackStatus = true;
+            return 1;
+        }
+
         public int DeleteDefencearea(int[] id)
         {
             GlobalVariable.TrackStatus = false;
