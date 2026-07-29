@@ -1054,26 +1054,30 @@ function initPoints(longLinkApi, acceptMsg, longLinkSendMsg) {
     sendMsg: longLinkSendMsg,
     onAcceptMessage: (res) => {
       const serverData = JSON.parse(res)
+      // 帧级批量：服务端发送的是数组
+      const targets = Array.isArray(serverData) ? serverData : [serverData]
 
-      // 按雷达IP过滤
-      if (queryParams.radarIp && serverData.radarIp && serverData.radarIp !== queryParams.radarIp) {
-        return
-      }
+      targets.forEach((data) => {
+        // 按雷达IP过滤
+        if (queryParams.radarIp && data.radarIp && data.radarIp !== queryParams.radarIp) {
+          return
+        }
 
-      const x = parseFloat(serverData.axesX) + 500
-      const y = 700 - parseFloat(serverData.axesY)
-      const typeName = mapTargetType(serverData.targetType)
-      points.push({
-        x,
-        y,
-        targetId: serverData.targetId,
-        targetType: typeName,
-        distance: serverData.distance ? parseFloat(serverData.distance).toFixed(1) : '--',
-        azimuth: serverData.azimuthAngle ? parseFloat(serverData.azimuthAngle).toFixed(1) : '--',
-        timestamp: Date.now(),
+        const x = parseFloat(data.axesX) + 500
+        const y = 700 - parseFloat(data.axesY)
+        const typeName = mapTargetType(data.targetType)
+        points.push({
+          x,
+          y,
+          targetId: data.targetId,
+          targetType: typeName,
+          distance: data.distance ? parseFloat(data.distance).toFixed(1) : '--',
+          azimuth: data.azimuthAngle ? parseFloat(data.azimuthAngle).toFixed(1) : '--',
+          timestamp: Date.now(),
+        })
+
+        if (points.length > 50) points.shift()
       })
-
-      if (points.length > 50) points.shift()
     },
   }).then(({ connection: sharedConnection, unsubscribe }) => {
     connection.value = sharedConnection

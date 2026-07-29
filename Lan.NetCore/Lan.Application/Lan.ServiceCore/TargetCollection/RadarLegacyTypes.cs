@@ -20,6 +20,9 @@ public interface IRvs_Target
     float ElevationAngle { get; }
     float Snr { get; }
     float PeakEnergy { get; }
+
+    /// <summary>目标捕获时间（帧解析完成时刻），精确到微秒。</summary>
+    DateTime CaptureTime { get; }
 }
 
 /// <summary>雷达目标列表（从 NsrRadarSdk 迁移，简化版）</summary>
@@ -29,10 +32,18 @@ public class RVS_Target_List
 
     public IRvs_Target[] Targets { get; private set; }
 
+    /// <summary>帧捕获时间（解析完成时刻），精确到微秒。</summary>
+    public DateTime CaptureTime { get; set; }
+
     public RVS_Target_List(IRvs_Target[] targets)
     {
         TargetNum = targets.Length;
         Targets = targets;
+    }
+
+    public RVS_Target_List(IRvs_Target[] targets, DateTime captureTime) : this(targets)
+    {
+        CaptureTime = captureTime;
     }
 }
 

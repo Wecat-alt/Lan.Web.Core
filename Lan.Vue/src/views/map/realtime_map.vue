@@ -338,26 +338,20 @@ onMounted(async () => {
   await nextTick()
 
   // 先加载配置，确保 initMap 直接用正确的中心点和缩放
-  try {
-    const centerRes = await proxy.getConfigKey('mapCenter')
-    if (centerRes?.data?.data) {
-      const ss = centerRes.data.data.split(',')
-      mapCenter_lat.value = parseFloat(ss[0])
-      mapCenter_lng.value = parseFloat(ss[1])
-    }
-  } catch (e) {}
-  try {
-    const zoomRes = await proxy.getConfigKey('mapZoom')
-    if (zoomRes?.data?.data) {
-      mapZoom.value = parseInt(zoomRes.data.data)
-    }
-  } catch (e) {}
-  try {
-    const isOpenRes = await proxy.getConfigKey('isOpen')
-    if (isOpenRes?.data?.data) {
-      alarmAutoPopupEnabled.value = String(isOpenRes.data.data) === '1'
-    }
-  } catch (e) {}
+  const centerRes = await proxy.getConfigKey('mapCenter')
+  if (centerRes?.data?.data) {
+    const ss = centerRes.data.data.split(',')
+    mapCenter_lat.value = parseFloat(ss[0])
+    mapCenter_lng.value = parseFloat(ss[1])
+  }
+  const zoomRes = await proxy.getConfigKey('mapZoom')
+  if (zoomRes?.data?.data) {
+    mapZoom.value = parseInt(zoomRes.data.data)
+  }
+  const isOpenRes = await proxy.getConfigKey('isOpen')
+  if (isOpenRes?.data?.data) {
+    alarmAutoPopupEnabled.value = String(isOpenRes.data.data) === '1'
+  }
 
   initDrawPolygon()
   initMap()
@@ -809,17 +803,19 @@ const initTrackManager = () => {
 const handleRadarData = (res) => {
   try {
     const serverData = JSON.parse(res)
+    // 帧级批量：服务端发送的是数组
+    const targets = Array.isArray(serverData) ? serverData : [serverData]
 
-    // 使用轨迹管理器处理数据
     if (trackManager.value) {
-      const processedData = trackManager.value.processRadarData(serverData)
-
-      if (processedData) {
-        latestAlarmTime = Date.now()
-        if (processedData.radarIp) {
-          openAlarmPopup(processedData.radarIp)
+      targets.forEach((item) => {
+        const processedData = trackManager.value.processRadarData(item)
+        if (processedData) {
+          latestAlarmTime = Date.now()
+          if (processedData.radarIp) {
+            openAlarmPopup(processedData.radarIp)
+          }
         }
-      }
+      })
     }
   } catch (error) {
     console.log('处理雷达数据失败:', error)

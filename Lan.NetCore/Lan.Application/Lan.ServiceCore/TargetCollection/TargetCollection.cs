@@ -98,7 +98,7 @@ namespace Lan.ServiceCore.TargetCollection
                 if (!PassQuickFilter(tar, halfAngle, preFilterMaxDist))
                     continue;
 
-                DateTime now = DateTime.Now;
+                DateTime now = radar.RadarTargets.CaptureTime;
                 string utime = now.ToString("yyyy-MM-dd HH:mm:ss:ffffff");
 
                 // ── Stage 2: Transform（昂贵运算，只对通过预筛的目标执行） ──
@@ -129,6 +129,10 @@ namespace Lan.ServiceCore.TargetCollection
             }
 
             WDefenceArea.AddTarget(radarTacks);
+
+            // 帧级批量 SignalR 发送（按雷达 IP 独立计时，1 秒最多 1 帧）
+            SignalRSender.SendFrameIfNeeded(radar.Ip, radarTacks);
+
             return isAdded;
         }
 
@@ -213,7 +217,7 @@ namespace Lan.ServiceCore.TargetCollection
         private static SendMS DispatchTarget(WRadar radar, IRvs_Target tar, RadarTargetItem tarItem,
             double lat, double lng, DateTime now, string utime, int alarmId, int areaId)
         {
-            // SendMS → Worker (SignalR 实时推送)
+            // SendMS 不再逐条入队 Worker，帧末统一通过 SignalRSender 批量发送
             var sms = new SendMS
             {
                 TargetId             = tarItem.TargetId,
@@ -232,7 +236,6 @@ namespace Lan.ServiceCore.TargetCollection
                 AxesZ                = tar.AxesZ,
                 AreaId               = areaId
             };
-            Worker.AddTarget(sms);
 
             // TrackInfo → RadarDataChannelService (轨迹写入数据库)
             var trackInfo = new TrackInfo

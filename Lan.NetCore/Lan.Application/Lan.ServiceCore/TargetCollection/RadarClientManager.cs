@@ -26,8 +26,8 @@ public sealed class RadarClientManager : BackgroundService
 {
     private readonly ILogger<RadarClientManager> _logger;
     private readonly IServiceProvider _serviceProvider;
-    private readonly ConcurrentDictionary<string, RadarClient> _clients = new();
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _receiveCts = new();
+    private static readonly ConcurrentDictionary<string, RadarClient> _clients = new();
+    private static readonly ConcurrentDictionary<string, CancellationTokenSource> _receiveCts = new();
 
     // 雷达状态缓存（在线状态 + 型号）—— static 确保 HostedService 和 Singleton 两个 DI 实例共享同一份数据
     private static readonly ConcurrentDictionary<string, RadarStatusCache> _statusCache = new();
@@ -344,8 +344,8 @@ public sealed class RadarClientManager : BackgroundService
     {
         try
         {
-            _logger.LogInformation("━━━━ [雷达 {Ip}] 收到 {Count} 个目标 命令字=0x{Cmd:X2} ━━━━",
-                ip, packet.Targets.Count, packet.Command);
+            _logger.LogInformation("━━━━ [雷达 {Ip}] 收到 {Count} 个目标 命令字=0x{Cmd:X2} 时间={Time} ━━━━",
+                ip, packet.Targets.Count, packet.Command, packet.CaptureTime.ToString("yyyy-MM-dd HH:mm:ss:ffffff"));
 
             for (int i = 0; i < packet.Targets.Count; i++)
             {
@@ -353,9 +353,10 @@ public sealed class RadarClientManager : BackgroundService
                 var dist = MathF.Sqrt(t.XAxis * t.XAxis + t.YAxis * t.YAxis);
                 _logger.LogInformation(
                     "  [#{Idx}] Id={Id} Type={Type} X={X:F2} Y={Y:F2} Z={Z:F2} Dist={Dist:F2}m " +
-                    "SpeedX={Sx:F2} SpeedY={Sy:F2} Azimuth={Az:F2}° Elevation={Elev:F2}° SNR={Snr:F1}",
+                    "SpeedX={Sx:F2} SpeedY={Sy:F2} Azimuth={Az:F2}° Elevation={Elev:F2}° SNR={Snr:F1} Time={Time}",
                     i + 1, t.Id, t.Type, t.XAxis, t.YAxis, t.ZAxis, dist,
-                    t.XSpeed, t.YSpeed, t.AzimuthAngle, t.ElevationAngle, t.Snr);
+                    t.XSpeed, t.YSpeed, t.AzimuthAngle, t.ElevationAngle, t.Snr,
+                    t.CaptureTime.ToString("yyyy-MM-dd HH:mm:ss:ffffff"));
             }
 
             // 1. 从 RadarManager 获取对应 WRadar
@@ -374,7 +375,7 @@ public sealed class RadarClientManager : BackgroundService
             }
 
             // 3. 构造旧版 RVS_Target_List 并填入 WRadar
-            var targetList = new RVS_Target_List(adaptedTargets);
+            var targetList = new RVS_Target_List(adaptedTargets, packet.CaptureTime);
             wRadar.RadarTargets = targetList;
 
             // 4. 触发 RadarManager 事件 → DefenceAreaManager.TargetDetectCallback

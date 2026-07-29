@@ -353,8 +353,11 @@ const initTrackManager = () => {
 const handleRadarData = (res) => {
   try {
     const serverData = JSON.parse(res)
+    // 帧级批量：服务端发送的是数组
+    const targets = Array.isArray(serverData) ? serverData : [serverData]
+
     if (trackManager.value) {
-      trackManager.value.processRadarData(serverData)
+      targets.forEach((item) => trackManager.value.processRadarData(item))
     }
   } catch (error) {
     console.log('处理雷达数据失败:', error)

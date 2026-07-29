@@ -407,7 +407,8 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
 
             case TargetUploadCommand:
             case TargetUploadCommandA9:
-                RadarTargetPacket targetPacket = ParseTargetPacket(packet);
+                DateTime captureTime = DateTime.Now;
+                RadarTargetPacket targetPacket = ParseTargetPacket(packet, captureTime);
                 TargetPacketReceived?.Invoke(targetPacket);
                 TargetUploadPacketReceived?.Invoke(packet.Length);
                 TargetUploadPacketDetected?.Invoke(cmd, packet.Length);
@@ -440,7 +441,7 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
     /// - A8：参数区第 1 字节是目标数（1字节）
     /// - A9：参数区前 4 字节是目标数（uint32 小端）
     /// </summary>
-    private static RadarTargetPacket ParseTargetPacket(ReadOnlySpan<byte> packet)
+    private static RadarTargetPacket ParseTargetPacket(ReadOnlySpan<byte> packet, DateTime captureTime)
     {
         ushort paramLength = BinaryPrimitives.ReadUInt16LittleEndian(packet.Slice(5, 2));
 
@@ -476,7 +477,7 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
         for (int i = 0; i < parseCount; i++)
         {
             int offset = targetDataStart + i * TargetBlockSize;
-            targets.Add(ParseSingleTarget(packet, offset));
+            targets.Add(ParseSingleTarget(packet, offset, captureTime));
         }
 
         return new RadarTargetPacket
@@ -486,7 +487,8 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
             DestinationAddress = packet[3],
             ParamLength = paramLength,
             TargetCount = targetCount,
-            Targets = targets
+            Targets = targets,
+            CaptureTime = captureTime
         };
     }
 
@@ -494,7 +496,7 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
     /// 解析单个目标结构。
     /// 单目标固定占 68 字节，字段顺序与 A8 / A9 协议文档一致。
     /// </summary>
-    private static RadarTarget ParseSingleTarget(ReadOnlySpan<byte> packet, int offset)
+    private static RadarTarget ParseSingleTarget(ReadOnlySpan<byte> packet, int offset, DateTime captureTime)
     {
         return new RadarTarget
         {
@@ -512,7 +514,8 @@ public sealed class RadarClient(RadarClientOptions options) : IAsyncDisposable
             Snr = ReadSingleLittleEndian(packet, offset + 44),
             PeakEnergy = ReadSingleLittleEndian(packet, offset + 48),
             Area = BinaryPrimitives.ReadUInt16LittleEndian(packet.Slice(offset + 52, 2)),
-            Reserved = packet.Slice(offset + 54, 14).ToArray()
+            Reserved = packet.Slice(offset + 54, 14).ToArray(),
+            CaptureTime = captureTime
         };
     }
 

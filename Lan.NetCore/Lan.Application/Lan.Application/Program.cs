@@ -9,6 +9,7 @@ using Lan.ServiceCore.Public;
 using Lan.ServiceCore.Signalr;
 using Lan.ServiceCore.TargetCollection;
 using MemoryCache.Core;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Memory;
 using SharpRTSPtoWebRTC.WebRTCProxy;
 using System.IO;
@@ -127,9 +128,6 @@ namespace Lan.Application
 
             //注入SignalR实时通讯，默认用json传输
             builder.Services.AddSignalR();
-            builder.Services.AddHostedService<Worker>();
-            builder.Services.AddHostedService<TrackTarget>();
-
             builder.Services.AddHostedService<RadarDataChannelService>();
             builder.Services.AddSingleton<RadarDataChannelService>(); //
 
@@ -249,6 +247,11 @@ namespace Lan.Application
             // 5. 终结点
             app.MapHub<MessageHub>("/hubs/stock");
             app.MapControllers();
+
+            // 初始化帧级批量 SignalR 发送器
+            var hubContext = app.Services.GetRequiredService<IHubContext<MessageHub>>();
+            SignalRSender.Initialize(hubContext);
+            TrackTargetSender.Initialize(hubContext);
 
             app.Run();
         }

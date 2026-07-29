@@ -161,7 +161,7 @@ namespace Lan.ServiceCore.Onvif
         {
             try
             {
-                TrackTarget.AddTrackTarget(target.targetId);
+                TrackTargetSender.Send(target.targetId);
             }
             catch
             {

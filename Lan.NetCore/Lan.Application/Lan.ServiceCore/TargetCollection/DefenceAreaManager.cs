@@ -1,4 +1,4 @@
-﻿using Lan.Database;
+﻿using Lan.ServiceCore.IService;
 using Lan.ServiceCore.WebScoket;
 using Model;
 using System.Collections.Concurrent;
@@ -41,17 +41,15 @@ namespace Lan.ServiceCore.TargetCollection
 
         private ConcurrentDictionary<int, WDefenceArea> LoadDefenceAreasFromDatabase()
         {
-            WDefenceArea[] allDefenceArea = DefenceAreaDatabase.GetDefenceAreas();
-            Dictionary<int, WDefenceArea> dic;
+            var defenceareaService = App.GetService<IDefenceareaService>();
+            var ds = defenceareaService.GetAllList();
 
-            if (allDefenceArea == null)
-                dic = new Dictionary<int, WDefenceArea>();
-            else
-            {
-                dic = allDefenceArea.ToDictionary(static c => c.ID);
-            }
+            if (ds.Count == 0)
+                return [];
 
-            return new ConcurrentDictionary<int, WDefenceArea>(dic);
+            return new ConcurrentDictionary<int, WDefenceArea>(
+                            ds.Select(static m => new WDefenceArea(m))
+                              .ToDictionary(static c => c.ID));
         }
 
         /// <summary>

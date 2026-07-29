@@ -29,4 +29,5 @@ internal sealed class RadarTargetAdapter : IRvs_Target
     public float ElevationAngle => _t.ElevationAngle;
     public float Snr => _t.Snr;
     public float PeakEnergy => _t.PeakEnergy;
+    public DateTime CaptureTime => _t.CaptureTime;
 }

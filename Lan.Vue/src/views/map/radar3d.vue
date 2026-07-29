@@ -132,10 +132,14 @@ function handleRadarData(res) {
   const radarLat = selectedRadar.value.lat
   const radarLng = selectedRadar.value.lng
 
-  const target = convertSignalRToTargetData(serverData, radarLat, radarLng)
-  // 只要 targetId 有效就送入 3D 场景，范围检测由 DroneTarget.setPosition 处理
-  if (target.targetId) {
-    setTargets([target])
+  // 帧级批量：服务端发送的是数组
+  const targets = Array.isArray(serverData) ? serverData : [serverData]
+  const converted = targets
+    .map((t) => convertSignalRToTargetData(t, radarLat, radarLng))
+    .filter((t) => t.targetId)
+
+  if (converted.length > 0) {
+    setTargets(converted)
   }
 }
 

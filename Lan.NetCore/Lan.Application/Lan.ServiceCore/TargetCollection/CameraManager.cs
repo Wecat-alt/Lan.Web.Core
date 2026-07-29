@@ -1,4 +1,4 @@
-﻿using Lan.Database;
+﻿using Lan.ServiceCore.IService;
 using Model;
 using System.Collections.Concurrent;
 using System.Data;
@@ -33,18 +33,16 @@ namespace Lan.ServiceCore.TargetCollection
 
         private ConcurrentDictionary<int, WCamera> LoadCamerasFromDatabase()
         {
-            WCamera[] allCamera = CameraDatabase.GetCameras();
 
-            Dictionary<int, WCamera> dic;
+            var cameraService = App.GetService<ICameraService>();
+            var ds = cameraService.GetAllList();
 
-            if (allCamera == null)
-                dic = new Dictionary<int, WCamera>();
-            else
-            {
-                dic = allCamera.ToDictionary(static c => c.ID);
-            }
+            if (ds.Count == 0)
+                return [];
 
-            return new ConcurrentDictionary<int, WCamera>(dic);
+            return new ConcurrentDictionary<int, WCamera>(
+                            ds.Select(static m => new WCamera(m))
+                              .ToDictionary(static c => c.ID));
         }
 
 

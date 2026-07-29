@@ -12,4 +12,7 @@ public sealed class RadarTargetPacket
     public required ushort ParamLength { get; init; }
     public required uint TargetCount { get; init; }
     public required IReadOnlyList<RadarTarget> Targets { get; init; }
+
+    /// <summary>帧捕获时间（解析完成时刻），精确到微秒。</summary>
+    public DateTime CaptureTime { get; init; }
 }
