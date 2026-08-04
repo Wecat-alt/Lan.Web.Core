@@ -706,3 +706,15 @@ div:focus {
     background: var(--el-color-primary-light-9);
 }
 
+/* 雷达扇形永久标签 */
+.sector-label-tooltip {
+  background: rgba(0, 0, 0, 0.75) !important;
+  border: none !important;
+  border-radius: 4px !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  white-space: nowrap;
+}
+

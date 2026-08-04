@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Lan.Application.Controllers.Base
 {
     /// <summary>
-    /// 前端 config.js 和 appsettings.json 配置同步更新接口
+    /// 前端 config.js 配置更新接口
     /// </summary>
     [Route("api/ansyc")]
     [ApiController]
@@ -18,7 +18,7 @@ namespace Lan.Application.Controllers.Base
         }
 
         /// <summary>
-        /// 同步更新 config.js 和 appsettings.json 中的 IP 地址（ip 必填）
+        /// 更新前端 config.js 中的 IP 地址（ip 必填）
         /// </summary>
         [HttpGet]
         public IActionResult UpdateConfig([FromQuery] string? ip = null)
@@ -27,20 +27,8 @@ namespace Lan.Application.Controllers.Base
             if (err != null)
                 return Message(err);
 
-            var results = new List<string>();
-
-            // 1. 更新 config.js
-            results.Add(_configJsUpdater.UpdateConfigJs(ip!));
-
-            // 2. 更新 appsettings.json 中的 CorsUrls
-            var appSettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-            results.Add(_configJsUpdater.UpdateAppSettings(ip!, appSettingsPath));
-
-            // 3. 回收应用池使 CORS 配置生效
-            var webConfigPath = Path.Combine(AppContext.BaseDirectory, "web.config");
-            results.Add(_configJsUpdater.RecycleAppPool(webConfigPath));
-
-            return Message(string.Join(" | ", results));
+            var result = _configJsUpdater.UpdateConfigJs(ip!);
+            return Message(result);
         }
 
         /// <summary>

@@ -21,7 +21,6 @@ public sealed class RadarTarget
     public float PeakEnergy { get; init; }
     public ushort Area { get; init; }
     public required byte[] Reserved { get; init; }
-
     /// <summary>目标捕获时间（帧解析完成时刻），精确到微秒。</summary>
     public DateTime CaptureTime { get; init; }
 }

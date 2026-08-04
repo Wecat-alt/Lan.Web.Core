@@ -1,4 +1,5 @@
 ﻿using Infrastructure.Model;
+using Lan.ServiceCore.Public;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -69,6 +70,13 @@ namespace Lan.Application.Controllers.System
         {
             var modal = parm.Adapt<SysConfig>().ToUpdate(HttpContext);
             var response = _SysConfigService.UpdateSysConfig(modal);
+
+            // 如果修改的是 GlobalVariable 中缓存的配置项，同步刷新
+            if (response > 0 && !string.IsNullOrEmpty(parm.ConfigKey)
+                && GlobalVariable.CachedConfigKeys.Contains(parm.ConfigKey))
+            {
+                GlobalVariable.Refresh();
+            }
 
             return ToResponse(response);
         }

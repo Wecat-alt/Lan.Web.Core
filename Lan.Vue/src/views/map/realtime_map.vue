@@ -469,6 +469,7 @@ function handall() {
           cameraURL,
         },
         iconUrl: defaultRadarIconUrl,
+        label: item.ip,
         onMarkerClick: ({ properties }) => {
           const { cameraIp, username, password, cameraURL } = properties
 
@@ -484,10 +485,15 @@ function handall() {
         onMarkerDragEnd: ({ event }) => {
           var lat1 = parseFloat(event.target._latlng.lat).toFixed(6)
           var lng1 = parseFloat(event.target._latlng.lng).toFixed(6)
+          const ip = event.target.options.ip
 
-          updateLatLng(event.target.options.ip, lat1, lng1).then((res) => {
+          updateLatLng(ip, lat1, lng1).then((res) => {
             const { status } = res
             if (status == 200) {
+              // 同步雷达新位置到 TrackManager，刷新跟踪扇形原点
+              if (trackManager.value) {
+                trackManager.value.updateRadarPosition(ip, parseFloat(lat1), parseFloat(lng1))
+              }
               clearAll()
               proxy.$modal.msgSuccess(proxy.$t('message.success'))
               handall()
@@ -499,6 +505,13 @@ function handall() {
       if (sectorLayer) {
         sectors.value.push(sectorLayer)
       }
+    }
+
+    // 同步雷达位置到 TrackManager（供跟踪扇形使用）
+    if (trackManager.value) {
+      radarOptions.value.forEach((item) => {
+        trackManager.value.updateRadarPosition(item.ip, item.latitude, item.longitude)
+      })
     }
   })
 }
@@ -694,6 +707,12 @@ function clearAll() {
       unregisterSectorMarker(map.value, sector.marker)
       map.value.removeLayer(sector.marker)
     }
+    if (sector.labelTooltip) {
+      if (sector.labelTooltip.__zoomHandler) {
+        map.value.off('zoomend', sector.labelTooltip.__zoomHandler)
+      }
+      map.value.removeLayer(sector.labelTooltip)
+    }
   })
   sectors.value = []
 }
@@ -774,12 +793,21 @@ onBeforeUnmount(() => {
 const initTrackManager = () => {
   if (!map.value) return
 
+  // 构建雷达位置映射（radarIp → {lat, lng}）
+  const radarPositions = new Map()
+  if (radarOptions.value && radarOptions.value.length > 0) {
+    radarOptions.value.forEach((item) => {
+      radarPositions.set(item.ip, { lat: item.latitude, lng: item.longitude })
+    })
+  }
+
   trackManager.value = new TrackManager(map.value, {
     historyLength: 50, // 保留50个历史点
     cleanupTimeout: 15000, // 5秒清理
     lineColor: '#3498db', // 默认蓝色
     lineWeight: 3, // 线宽
     lineOpacity: 0.7, // 透明度
+    radarPositions, // 传入雷达位置映射，供跟踪扇形使用
   })
 
   // 设置事件回调

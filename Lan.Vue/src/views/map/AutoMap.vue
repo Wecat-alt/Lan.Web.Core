@@ -109,7 +109,7 @@ const tileUrlInput = ref(DEFAULT_TILE_URL)
 const currentTileUrl = ref(DEFAULT_TILE_URL)
 const downloading = ref(false)
 const downloadingToServer = ref(false)
-const targetFolder = ref('')
+const targetFolder = ref('C:\\RVS_WEB\\publish\\wwwroot\\maptile_gaode')
 const statusMessage = ref('')
 const progress = ref({
   total: 0,
@@ -243,9 +243,22 @@ const handleServerDownload = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  let mapCenter = undefined
+
+  try {
+    const centerRes = await proxy.getConfigKey('mapCenter')
+    if (centerRes?.data?.data) {
+      const parts = centerRes.data.data.split(',')
+      mapCenter = [parseFloat(parts[0]), parseFloat(parts[1])]
+    }
+  } catch {
+    // 使用默认值
+  }
+
   mapInstance = createAutoMap(mapContainer.value, {
     tileUrl: currentTileUrl.value,
+    center: mapCenter,
     onRectangleSelected,
   })
 

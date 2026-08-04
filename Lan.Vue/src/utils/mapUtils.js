@@ -49,6 +49,46 @@ const createSectorPoints = (lat, lon, radius, startAngle, endAngle) => {
   return { center, points }
 }
 
+/**
+ * 创建跟踪目标扇形（4°，半透明红色虚线）
+ * @param {L.Map} map - Leaflet 地图实例
+ * @param {number} radarLat - 雷达纬度
+ * @param {number} radarLng - 雷达经度
+ * @param {number} azimuthAngle - 目标方位角（度，0=北，90=东）
+ * @param {number} distance - 目标距离（米）
+ * @returns {L.Polygon} 跟踪扇形 Leaflet 多边形
+ */
+export function createTrackingSector(map, radarLat, radarLng, azimuthAngle, distance) {
+  const startAngle = azimuthAngle - 4
+  const endAngle = azimuthAngle + 4
+  const radius = distance * 1.2
+  const { points } = createSectorPoints(radarLat, radarLng, radius, startAngle, endAngle)
+  return L.polygon(points, {
+    color: '#ff0000',
+    fillColor: '#ff0000',
+    fillOpacity: 0.12,
+    weight: 1.5,
+    interactive: false,
+  }).addTo(map)
+}
+
+/**
+ * 更新已有跟踪扇形位置（不删除重建，直接 setLatLngs）
+ * @param {L.Polygon} polygon - 已有的跟踪扇形多边形
+ * @param {number} radarLat - 雷达纬度
+ * @param {number} radarLng - 雷达经度
+ * @param {number} azimuthAngle - 目标方位角（度）
+ * @param {number} distance - 目标距离（米）
+ */
+export function updateTrackingSector(polygon, radarLat, radarLng, azimuthAngle, distance) {
+  if (!polygon) return
+  const startAngle = azimuthAngle - 4
+  const endAngle = azimuthAngle + 4
+  const radius = distance * 1.2
+  const { points } = createSectorPoints(radarLat, radarLng, radius, startAngle, endAngle)
+  polygon.setLatLngs(points)
+}
+
 const getMarkerStore = (map) => {
   if (!map.__sectorMarkerStore) {
     Object.defineProperty(map, '__sectorMarkerStore', {
@@ -300,6 +340,7 @@ export function ints({
   iconAnchor = [12, 25],
   onMarkerClick,
   onMarkerDragEnd,
+  label,
 }) {
   if (!map) {
     return null
@@ -316,6 +357,7 @@ export function ints({
   }).addTo(map)
 
   let marker = null
+  let labelTooltip = null
 
   if (showMarker) {
     marker = createOrUpdateSectorMarker({
@@ -340,10 +382,43 @@ export function ints({
     })
   }
 
+  // 扇形圆心标签 — 始终在扇形朝向的反方向，不遮挡防区
+  if (label) {
+    const midAngle = (startAngle + endAngle) / 2
+    const cLat = parseFloat(lat)
+    const cLng = parseFloat(lon)
+
+    const updateLabelPosition = () => {
+      const zoom = map.getZoom()
+      // 基准 17 级：水平80m，垂直30m；每升一级减50m，不低于10m
+      const offsetX = Math.max(10, 80 - (zoom - 17) * 50)
+      const offsetY = Math.max(10, 30 - (zoom - 17) * 50)
+      const oppositeRad = degreeToRadian(midAngle + 180)
+      const labelLat = cLat + (offsetY * Math.sin(oppositeRad)) / 111320
+      const labelLng = cLng + (offsetX * Math.cos(oppositeRad)) / (111320 * Math.cos(cLat * Math.PI / 180))
+      labelTooltip.setLatLng([labelLat, labelLng])
+    }
+
+    labelTooltip = L.tooltip({
+      permanent: true,
+      direction: 'center',
+      className: 'sector-label-tooltip',
+    })
+      .setContent(label)
+      .setLatLng([cLat, cLng])
+      .addTo(map)
+
+    updateLabelPosition()
+    map.on('zoomend', updateLabelPosition)
+    // 存引用以便销毁时解绑
+    labelTooltip.__zoomHandler = updateLabelPosition
+  }
+
   return {
     polygon,
     marker,
     center,
+    labelTooltip,
   }
 }
 

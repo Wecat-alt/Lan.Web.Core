@@ -1,5 +1,14 @@
 <template>
   <starBackground></starBackground>
+  <div class="deploy-warning" v-if="isLocalhostDeploy">
+    <el-alert type="warning" :closable="false" show-icon>
+      <template #title>
+        {{ $t('common.deploy_localhost_warning') }}
+        <el-tag>{{ ansycApiUrl }}</el-tag>
+        {{ $t('common.deploy_localhost_action') }}
+      </template>
+    </el-alert>
+  </div>
   <div class="login-wrap">
     <div style="position: fixed; top: 20px; right: 20px">
       <LanguageSwitcher />
@@ -69,7 +78,7 @@ import { login } from '@/api/system/login'
 import { initializeLocalPlayerSocket } from '@/utils/localPlayerSocket'
 import { buildAuthProfile, setAuthProfile } from '@/utils/permission'
 import starBackground from '@/views/components/starBackground.vue'
-import { getCurrentInstance, ref } from 'vue'
+import { getCurrentInstance, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 // import { useAuthStore } from '../stores/auth'
 
@@ -108,6 +117,17 @@ const loginRules = {
 const loginType = ref(1)
 const loading = ref(false)
 
+const isLocalhostDeploy = computed(() => {
+  const config = window.__APP_CONFIG__ || {}
+  return (config.VITE_APP_API_BASE_URL || '').includes('localhost')
+})
+
+const ansycApiUrl = computed(() => {
+  const config = window.__APP_CONFIG__ || {}
+  const baseUrl = (config.VITE_APP_API_BASE_URL || '').replace(/\/+$/, '')
+  return `${baseUrl}/api/ansyc?ip=${proxy.$t('common.deploy_your_ip')}`
+})
+
 const handleLogin = async () => {
   loading.value = true
   try {
@@ -139,4 +159,12 @@ const handleLogin = async () => {
 
 <style lang="scss" scoped>
 @use '../assets/styles/login.scss';
+
+.deploy-warning {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}
 </style>

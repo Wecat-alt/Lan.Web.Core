@@ -1,5 +1,4 @@
 ﻿using Lan.ServiceCore.Signalr;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;

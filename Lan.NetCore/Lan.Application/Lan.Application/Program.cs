@@ -167,6 +167,15 @@ namespace Lan.Application
 
             var app = builder.Build();
 
+            // 支持作为 Windows 服务运行
+            if (OperatingSystem.IsWindows())
+            {
+                builder.Host.UseWindowsService(options =>
+                {
+                    options.ServiceName = "RVS-M-Web";
+                });
+            }
+
             InternalApp.ServiceProvider = app.Services;
             InternalApp.Configuration = builder.Configuration;
             InternalApp.WebHostEnvironment = app.Environment;
@@ -227,6 +236,10 @@ namespace Lan.Application
 
             app.UseHttpsRedirection();
 
+            // 托管前端静态文件（wwwroot 目录）
+            app.UseDefaultFiles();
+            app.UseStaticFiles();
+
             // Swagger（开发/演示环境始终启用）
             app.UseSwagger();
             app.UseSwaggerUI();
@@ -248,6 +261,9 @@ namespace Lan.Application
             app.MapHub<MessageHub>("/hubs/stock");
             app.MapControllers();
 
+            // SPA 回退：非 API 路由返回 index.html（支持前端路由如 /realtime_map）
+            app.MapFallbackToFile("index.html");
+
             // 初始化帧级批量 SignalR 发送器
             var hubContext = app.Services.GetRequiredService<IHubContext<MessageHub>>();
             SignalRSender.Initialize(hubContext);
@@ -264,13 +280,10 @@ namespace Lan.Application
             var localIps = ConfigJsUpdater.GetAllLocalIPv4();
             foreach (var ip in localIps)
             {
-                var frontend = $"http://{ip}:5122";
-                var backend = $"http://{ip}:1233";
+                var frontend = $"http://{ip}:8080";
 
                 if (!corsOrigins.Contains(frontend))
                     corsOrigins.Add(frontend);
-                if (!corsOrigins.Contains(backend))
-                    corsOrigins.Add(backend);
             }
         }
     }

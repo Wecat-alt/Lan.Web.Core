@@ -1,5 +1,14 @@
 <template>
   <el-container class="app-shell">
+    <div v-if="isLocalhostDeploy" class="deploy-warning">
+      <el-alert type="warning" :closable="false" show-icon>
+        <template #title>
+          {{ $t('common.deploy_localhost_warning') }}
+          <el-tag>{{ ansycApiUrl }}</el-tag>
+          {{ $t('common.deploy_localhost_action') }}
+        </template>
+      </el-alert>
+    </div>
     <el-header class="app-header">
       <div class="header-content">
         <div class="logo-con">
@@ -31,7 +40,7 @@
 <script>
 import { canAccessMenu, getAuthProfile } from '@/utils/permission'
 import { ensureSignalRConnection, setSignalRReceiveEnabled } from '@/utils/signalRUtils'
-import { defineComponent, getCurrentInstance, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, defineComponent, getCurrentInstance, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 
 import AppSidebar from '../components/AppSidebar.vue'
 import Home from '../views/Home.vue'
@@ -146,6 +155,17 @@ export default defineComponent({
       }
     }
 
+    const isLocalhostDeploy = computed(() => {
+      const config = window.__APP_CONFIG__ || {}
+      return (config.VITE_APP_API_BASE_URL || '').includes('localhost')
+    })
+
+    const ansycApiUrl = computed(() => {
+      const config = window.__APP_CONFIG__ || {}
+      const baseUrl = (config.VITE_APP_API_BASE_URL || '').replace(/\/+$/, '')
+      return `${baseUrl}/api/ansyc?ip=${proxy.$t('common.deploy_your_ip')}`
+    })
+
     onMounted(() => {
       if (signalRApi) {
         ensureSignalRConnection({ api: signalRApi })
@@ -163,6 +183,8 @@ export default defineComponent({
       currentView,
       currentViewKey,
       username,
+      isLocalhostDeploy,
+      ansycApiUrl,
       handleMenuChange,
     }
   },
@@ -173,6 +195,16 @@ export default defineComponent({
 .app-shell {
   height: 100vh;
   overflow: hidden;
+}
+
+.deploy-warning {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.deploy-warning .el-alert {
+  border-radius: 0;
 }
 
 .app-main {

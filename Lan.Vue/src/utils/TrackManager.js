@@ -1,9 +1,12 @@
 import * as L from 'leaflet'
+import { createTrackingSector, updateTrackingSector } from './mapUtils'
 
 export class TrackManager {
   constructor(map, options = {}) {
     this.map = map
     this.targets = new Map() // 存储所有目标轨迹
+    this.radarPositions = options.radarPositions || new Map() // Map<radarIp, {lat, lng}>
+    this._trackingSector = null // 当前跟踪扇形（实例级，不绑目标对象）
     this.options = {
       historyLength: 100, // 保留的历史点数
       cleanupTimeout: 5000, // 5秒清理超时目标（毫秒）
@@ -87,6 +90,20 @@ export class TrackManager {
     // 存储最新数据
     target.data = targetData
 
+    // 如果当前目标是跟踪目标，更新跟踪扇形
+    if (this.trackTargetId === targetId && this._trackingSector) {
+      const radarPos = this.radarPositions.get(targetData.radarIp)
+      if (radarPos) {
+        updateTrackingSector(
+          this._trackingSector,
+          radarPos.lat,
+          radarPos.lng,
+          targetData.azimuthAngle,
+          targetData.distance,
+        )
+      }
+    }
+
     // 限制历史轨迹长度
     this._limitHistoryLength(targetId)
   }
@@ -113,13 +130,33 @@ export class TrackManager {
     this._updateMarkerPopup(marker, targetData)
 
     // 存储目标数据
-    this.targets.set(targetId, {
+    const target = {
       polyline,
       marker,
       coordinates,
       lastUpdate: timestamp,
       data: targetData,
-    })
+    }
+
+    // 如果新目标恰好是跟踪目标（TrackTargetData 先于位置数据到达）
+    if (this.trackTargetId === targetId) {
+      polyline.setStyle({
+        color: '#ff0000',
+        weight: this.options.lineWeight + 1,
+      })
+      const radarPos = this.radarPositions.get(targetData.radarIp)
+      if (radarPos) {
+        this._trackingSector = createTrackingSector(
+          this.map,
+          radarPos.lat,
+          radarPos.lng,
+          targetData.azimuthAngle,
+          targetData.distance,
+        )
+      }
+    }
+
+    this.targets.set(targetId, target)
   }
 
   // 获取轨迹线颜色
@@ -275,6 +312,15 @@ export class TrackManager {
         this._removeTargetFromMap(target)
         this.targets.delete(targetId)
         removedTargets.push(targetId)
+
+        // 如果被清理的是当前跟踪目标，重置跟踪状态
+        if (this.trackTargetId === targetId) {
+          this.trackTargetId = null
+          if (this._trackingSector) {
+            this.map.removeLayer(this._trackingSector)
+            this._trackingSector = null
+          }
+        }
       }
     }
 
@@ -296,11 +342,19 @@ export class TrackManager {
     }
   }
 
-  // 设置跟踪目标（高亮显示）
+  // 设置跟踪目标（高亮显示 + 跟踪扇形）
   setTrackTarget(targetId) {
-    // 重置之前跟踪目标的样式
-    if (this.trackTargetId && this.trackTargetId !== targetId) {
-      const prevTarget = this.targets.get(this.trackTargetId)
+    const prevTrackedId = this.trackTargetId
+
+    // 1. 始终移除旧跟踪扇形（实例级引用，不依赖目标对象是否存在）
+    if (this._trackingSector) {
+      this.map.removeLayer(this._trackingSector)
+      this._trackingSector = null
+    }
+
+    // 2. 恢复旧目标的折线颜色（即使目标已被 cleanup 移除也没关系）
+    if (prevTrackedId && prevTrackedId !== targetId) {
+      const prevTarget = this.targets.get(prevTrackedId)
       if (prevTarget && prevTarget.polyline) {
         prevTarget.polyline.setStyle({
           color: this._getLineColor(prevTarget.data),
@@ -309,34 +363,89 @@ export class TrackManager {
       }
     }
 
-    // 设置新的跟踪目标
+    // 3. 设置新的跟踪目标
     this.trackTargetId = targetId
     const target = this.targets.get(targetId)
 
     if (target) {
-      // 高亮显示
+      // 高亮折线
       if (target.polyline) {
         target.polyline.setStyle({
-          color: '#ff0000', // 红色高亮
-          weight: this.options.lineWeight + 1, // 加粗
+          color: '#ff0000',
+          weight: this.options.lineWeight + 1,
         })
       }
 
-      // 打开弹窗并居中显示
-      // if (target.marker) {
-      //   target.marker.openPopup();
-      //   this.map.panTo(target.marker.getLatLng());
-      // }
+      // 创建跟踪扇形
+      const targetData = target.data
+      if (targetData && targetData.radarIp) {
+        const radarPos = this.radarPositions.get(targetData.radarIp)
+        if (radarPos) {
+          this._trackingSector = createTrackingSector(
+            this.map,
+            radarPos.lat,
+            radarPos.lng,
+            targetData.azimuthAngle,
+            targetData.distance,
+          )
+        }
+      }
 
-      // 触发跟踪事件
       if (this.onTargetTracked) {
         this.onTargetTracked(targetId, target.data)
       }
     }
   }
 
+  // 清除当前跟踪目标（取消跟踪）
+  clearTrackTarget() {
+    // 移除跟踪扇形
+    if (this._trackingSector) {
+      this.map.removeLayer(this._trackingSector)
+      this._trackingSector = null
+    }
+
+    // 恢复折线颜色
+    if (this.trackTargetId) {
+      const target = this.targets.get(this.trackTargetId)
+      if (target && target.polyline) {
+        target.polyline.setStyle({
+          color: this._getLineColor(target.data),
+          weight: this.options.lineWeight,
+        })
+      }
+    }
+
+    this.trackTargetId = null
+  }
+
+  // 更新雷达位置（雷达标记拖拽后同步）
+  updateRadarPosition(radarIp, lat, lng) {
+    this.radarPositions.set(radarIp, { lat, lng })
+
+    // 如果当前跟踪目标属于该雷达，刷新跟踪扇形
+    if (this.trackTargetId && this._trackingSector) {
+      const target = this.targets.get(this.trackTargetId)
+      if (target && target.data && target.data.radarIp === radarIp) {
+        updateTrackingSector(
+          this._trackingSector,
+          lat,
+          lng,
+          target.data.azimuthAngle,
+          target.data.distance,
+        )
+      }
+    }
+  }
+
   // 清除所有目标
   clearAll() {
+    // 移除跟踪扇形
+    if (this._trackingSector) {
+      this.map.removeLayer(this._trackingSector)
+      this._trackingSector = null
+    }
+
     for (const [targetId, target] of this.targets.entries()) {
       this._removeTargetFromMap(target)
     }
@@ -346,6 +455,11 @@ export class TrackManager {
     if (this.onAllCleared) {
       this.onAllCleared()
     }
+  }
+
+  // 获取雷达位置映射（供外部构建 radarPositions Map）
+  getRadarPositions() {
+    return this.radarPositions
   }
 
   // 获取目标信息

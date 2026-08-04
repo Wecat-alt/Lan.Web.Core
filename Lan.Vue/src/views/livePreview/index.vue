@@ -292,6 +292,13 @@ function handall() {
         sectors.value.push(sectorLayer)
       }
     }
+
+    // 同步雷达位置到 TrackManager（供跟踪扇形使用）
+    if (trackManager.value) {
+      radarOptions.value.forEach((item) => {
+        trackManager.value.updateRadarPosition(item.ip, item.latitude, item.longitude)
+      })
+    }
   })
 }
 
@@ -337,12 +344,21 @@ async function init(api, acceptMsg, sendMsg) {
 const initTrackManager = () => {
   if (!mapInstance.value) return
 
+  // 构建雷达位置映射（radarIp → {lat, lng}）
+  const radarPositions = new Map()
+  if (radarOptions.value && radarOptions.value.length > 0) {
+    radarOptions.value.forEach((item) => {
+      radarPositions.set(item.ip, { lat: item.latitude, lng: item.longitude })
+    })
+  }
+
   trackManager.value = new TrackManager(mapInstance.value, {
     historyLength: 50,
     cleanupTimeout: 15000,
     lineColor: '#3498db',
     lineWeight: 3,
     lineOpacity: 0.7,
+    radarPositions, // 传入雷达位置映射，供跟踪扇形使用
   })
 
   trackManager.value.onTargetTracked = (targetId) => {

@@ -27,5 +27,6 @@ namespace Lan.Dto
 
         public float Latitude { get; set; }
         public float Longitude { get; set; }
+        public string RadarIp { get; set; }
     }
 }
